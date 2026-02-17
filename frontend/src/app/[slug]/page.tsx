@@ -1,0 +1,626 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useCart } from '@/context/CartContext';
+import { ProductModal } from '@/components/Menu/ProductModal';
+import { ShoppingBag, ChevronRight, X, Clock, MapPin } from 'lucide-react';
+
+interface StoreData {
+    id: number;
+    nome: string;
+    cor_primaria: string;
+    cor_secundaria: string;
+    logo: string;
+    whatsapp: string;
+    endereco: string;
+    horario_funcionamento: any;
+    categorias: any[];
+    banner?: string;
+}
+
+const DIAS_MAP: Record<number, string> = {
+    0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab'
+};
+
+type PaymentMethod = 'DINHEIRO' | 'DEBITO' | 'CREDITO' | 'PIX';
+
+export default function PublicMenuPage() {
+    const { slug } = useParams();
+    const { cart, addToCart, removeFromCart, total, clearCart } = useCart();
+
+    const [store, setStore] = useState<StoreData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isOpenStatus, setIsOpenStatus] = useState({ open: false, label: 'Fechado' });
+    const [isScrolled, setIsScrolled] = useState(false);
+
+    // Checkout State
+    const [view, setView] = useState<'cart' | 'checkout'>('cart');
+    const [checkoutData, setCheckoutData] = useState({
+        nome: '',
+        telefone: '',
+        endereco: '',
+        pagamento: 'PIX' as PaymentMethod,
+        troco: ''
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const checkStoreStatus = (data: StoreData) => {
+        if (!data?.horario_funcionamento) return;
+
+        const now = new Date();
+        const diaSemana = DIAS_MAP[now.getDay()];
+        const horarioHoje = data.horario_funcionamento[diaSemana];
+
+        let isOpen = false;
+        const curTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // Helper to check time range
+        const isTimeInRange = (open: string, close: string, current: string) => {
+            if (close < open) {
+                // Crosses midnight (e.g. 18:00 to 02:00 OR 18:00 to 00:00)
+                return current >= open || current <= close;
+            }
+            return current >= open && current <= close;
+        };
+
+        // Check Today's Schedule
+        if (horarioHoje) {
+            if (typeof horarioHoje === 'string') {
+                if (horarioHoje.toLowerCase() !== 'fechado' && horarioHoje.includes('-')) {
+                    const [inicio, fim] = horarioHoje.split('-');
+                    isOpen = isTimeInRange(inicio.trim(), fim.trim(), curTime);
+                }
+            } else if (typeof horarioHoje === 'object' && !horarioHoje.closed) {
+                isOpen = isTimeInRange(horarioHoje.open, horarioHoje.close, curTime);
+            }
+        }
+
+        // If closed, check if it's a late shift from Yesterday (e.g. it's 01:00 AM)
+        if (!isOpen) {
+            const yesterdayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
+            const diaOntem = DIAS_MAP[yesterdayIndex];
+            const horarioOntem = data.horario_funcionamento[diaOntem];
+
+            if (horarioOntem && typeof horarioOntem === 'object' && !horarioOntem.closed) {
+                if (horarioOntem.close < horarioOntem.open) {
+                    // Yesterday crossed midnight, check if we are still within that window (before close time)
+                    if (curTime <= horarioOntem.close) isOpen = true;
+                }
+            }
+        }
+
+        setIsOpenStatus({ open: isOpen, label: isOpen ? 'Aberto' : 'Fechado' });
+    };
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 200);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        const fetchStore = async () => {
+            if (!slug) return;
+            const currentSlug = Array.isArray(slug) ? slug[0] : slug;
+
+            try {
+                // Ensure we call the correct relative API path
+                const response = await fetch(`/api/lojas/${currentSlug}/`);
+
+                if (!response.ok) {
+                    console.error(`Error ${response.status}: Failed to fetch store ${currentSlug}`);
+                    setStore(null);
+                    setLoading(false);
+                    return;
+                }
+                const data = await response.json();
+                console.log('DEBUG: Store Data:', data);
+                setStore(data);
+                checkStoreStatus(data);
+            } catch (error) {
+                console.error('Error fetching store:', error);
+                setStore(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStore();
+    }, [slug]);
+
+    useEffect(() => {
+        if (!store) return;
+        const interval = setInterval(() => checkStoreStatus(store), 60000); // Update every minute
+        return () => clearInterval(interval);
+    }, [store]);
+
+    const getImageUrl = (url: string) => {
+        if (!url) return '';
+        // If the URL comes from our internal backend container, make it relative
+        // to use the Next.js rewrite proxy.
+        if (url.includes('backend:8000')) {
+            return url.split('backend:8000')[1];
+        }
+        return url;
+    };
+
+    const formatCurrency = (val: number) => `R$ ${val.toFixed(2)}`;
+
+    const formatWhatsappNumber = (phone: string) => {
+        const cleaned = phone.replace(/\D/g, '');
+        // If it starts with 55 and is 12-13 digits, it's likely already correct.
+        // If it's 10-11 digits (DDD + Number), prepend 55.
+        if (cleaned.length >= 10 && cleaned.length <= 11) {
+            return `55${cleaned}`;
+        }
+        return cleaned;
+    };
+
+    const handleSubmitOrder = async () => {
+        if (!store) return;
+
+        if (!isOpenStatus.open) {
+            alert('A loja está fechada no momento. Confira o horário de funcionamento.');
+            return;
+        }
+
+        if (!checkoutData.nome || !checkoutData.telefone || !checkoutData.endereco) {
+            alert('Por favor, preencha todos os campos obrigatórios.');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            // Prepare payload for Backend
+            const payload = {
+                loja: store.id,
+                cliente_nome: checkoutData.nome,
+                cliente_whatsapp: checkoutData.telefone,
+                endereco: checkoutData.endereco,
+                total: total,
+                forma_pagamento: checkoutData.pagamento,
+                itens: cart.map(item => ({
+                    produto: item.productId,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.precoBase + item.atributos.reduce((s, a) => s + a.preco, 0),
+                    observacoes: '', // Add observation field later if needed
+                    selecoes: item.atributos.map(attr => ({
+                        grupo: attr.grupoNome,
+                        opcao: attr.nome,
+                        preco: attr.preco
+                    }))
+                }))
+            };
+
+            // Save to DB
+            const response = await fetch('/api/pedidos/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error('Falha ao criar pedido: ' + err);
+            }
+
+            // Construct WhatsApp Message
+            const orderId = `#${Date.now().toString().slice(-4)}`;
+            let message = `*🔔 NOVO PEDIDO ${orderId}* 🔔\n\n`;
+
+            message += `👤 *Cliente:* ${checkoutData.nome}\n`;
+            if (checkoutData.telefone) message += `📞 *Contato:* ${checkoutData.telefone}\n`;
+            message += `\n`;
+
+            message += `🛒 *RESUMO DO PEDIDO:*\n`;
+            cart.forEach(item => {
+                const totalAttrs = item.atributos.reduce((sum, attr) => sum + Number(attr.preco), 0);
+                const itemTotal = (Number(item.precoBase) + totalAttrs) * item.quantidade;
+
+                message += `▪️ ${item.quantidade}x *${item.nome}*\n`;
+                item.atributos.forEach(attr => {
+                    message += `   └ _${attr.nome} (+${formatCurrency(Number(attr.preco))})_\n`;
+                });
+                // message += `   💲 _Subtotal: ${formatCurrency(itemTotal)}_\n`; 
+                message += `\n`;
+            });
+
+            message += `📍 *ENTREGA:*\n${checkoutData.endereco}\n\n`;
+
+            message += `💳 *PAGAMENTO:*\n`;
+            message += `Forma: ${checkoutData.pagamento}\n`;
+            if (checkoutData.pagamento === 'DINHEIRO' && checkoutData.troco) {
+                message += `Troco para: R$ ${checkoutData.troco}\n`;
+            }
+
+            message += `\n💰 *TOTAL A PAGAR: ${formatCurrency(total)}*\n`;
+            message += `\n_Pedido enviado via Cardápio Digital_`;
+
+            // Open WhatsApp
+            // Ensure encoded message handles special characters correctly
+            const encoded = encodeURIComponent(message);
+            const cleanPhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
+            window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
+
+            // Cleanup
+            clearCart();
+            setIsCartOpen(false);
+            setView('cart');
+            setCheckoutData({ nome: '', telefone: '', endereco: '', pagamento: 'PIX', troco: '' });
+            alert('Pedido enviado com sucesso!');
+
+        } catch (error) {
+            console.error(error);
+            alert('Ocorreu um erro ao enviar o pedido. Tente novamente.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 animate-pulse font-black text-primary italic uppercase tracking-widest">Carregando...</div>;
+    if (!store) return <div className="min-h-screen flex items-center justify-center text-xl font-black italic uppercase tracking-tight text-gray-400">Loja não encontrada.</div>;
+
+    return (
+        <div className="min-h-screen pb-40 relative">
+            {/* Background Layer */}
+            <div className="fixed inset-0 z-0">
+                {/* Image Layer */}
+                {store.banner ? (
+                    <div
+                        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
+                        style={{ backgroundImage: `url(${getImageUrl(store.banner)})` }}
+                    />
+                ) : (
+                    <div className="absolute inset-0" style={{ backgroundColor: store.cor_secundaria }} />
+                )}
+            </div>
+
+            {/* Content Layer */}
+            <div className="relative z-10">
+                {/* Sticky Header Bar */}
+                <div className={`fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 p-4 transition-all duration-300 flex items-center justify-between ${isScrolled ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-white">
+                            <img src={getImageUrl(store.logo)} alt={store.nome} className="w-full h-full object-cover" />
+                        </div>
+                        <h2 className="font-black italic uppercase tracking-tighter text-gray-900 line-clamp-1">{store.nome}</h2>
+                    </div>
+                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${isOpenStatus.open ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                        {isOpenStatus.label}
+                    </div>
+                </div>
+
+                {/* Header Premium (App Style) */}
+                <header className="relative w-full">
+                    {/* Banner Area - SPACER ONLY */}
+                    <div className="h-32 md:h-48 w-full relative overflow-hidden" />
+
+                    {/* Overlapping Identity Area */}
+                    <div className="relative -mt-16 px-6 flex flex-col items-center z-20">
+                        {/* Logo - Circular and Floating */}
+                        <div className="w-28 h-28 rounded-full border-4 border-white shadow-2xl bg-white overflow-hidden animate-slide-up">
+                            {store.logo ? (
+                                <img src={getImageUrl(store.logo)} alt={store.nome} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100 italic font-black text-gray-300 text-2xl">
+                                    {store.nome.substring(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Store Title - Big & Impactful */}
+                        <div className="mt-6 text-center space-y-4 animate-slide-up w-full max-w-2xl flex flex-col items-center">
+                            <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase leading-none text-gray-900 drop-shadow-sm bg-white/60 backdrop-blur-md py-4 px-8 rounded-3xl inline-block shadow-sm">
+                                {store.nome}
+                            </h1>
+
+                            {/* Metadata Row */}
+                            <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-sm font-bold text-gray-700 bg-white/60 backdrop-blur-md py-3 px-6 rounded-2xl inline-flex self-center shadow-sm">
+                                {/* Status Badge */}
+                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isOpenStatus.open ? 'bg-green-500 text-white' : 'bg-red-500 text-white'} shadow-sm`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full bg-white animate-pulse`} />
+                                    {isOpenStatus.label}
+                                </div>
+
+                                {/* Current Hours */}
+                                <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
+                                    <Clock size={14} className="text-gray-500" />
+                                    {(() => {
+                                        const now = new Date();
+                                        const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
+                                        if (!h) return 'Horário não definido';
+                                        if (typeof h === 'string') return h; // Legacy support
+                                        if (h.closed) return 'Fechado hoje';
+                                        return `${h.open} - ${h.close}`;
+                                    })()}
+                                </div>
+
+                                {/* Address (Hidden on small screens if too long, maybe?) */}
+                                {store.endereco && (
+                                    <div className="hidden md:flex items-center gap-2 text-xs uppercase tracking-wider border-l border-gray-300 pl-4">
+                                        <MapPin size={14} className="text-gray-500" />
+                                        <span className="truncate max-w-[200px]">{store.endereco}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Mobile Address (Separate line) */}
+                            {store.endereco && (
+                                <p className="md:hidden text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 mt-2">
+                                    <MapPin size={12} /> {store.endereco}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                {/* Main Menu */}
+                <main className="max-w-4xl mx-auto p-6 mt-8 space-y-12">
+                    {store.categorias?.map((cat, idx) => (
+                        <section key={`${cat.id}-${idx}`} className="animate-slide-up" style={{ animationDelay: `${(idx + 2) * 100}ms` }}>
+                            <div className="flex items-center gap-4 mb-8">
+                                <div className="h-[2px] flex-1 bg-gray-100"></div>
+                                <h2 className="text-2xl font-black uppercase italic tracking-tighter" style={{ color: store.cor_primaria }}>
+                                    {cat.nome}
+                                </h2>
+                                <div className="h-[2px] flex-1 bg-gray-100"></div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {cat.produtos.map(prod => (
+                                    <button
+                                        key={prod.id}
+                                        onClick={() => setSelectedProduct(prod)}
+                                        className="bg-white p-5 rounded-[2.5rem] shadow-sm flex gap-5 hover:shadow-2xl hover:-translate-y-2 transition-all text-left group border border-gray-50"
+                                    >
+                                        <div className="flex-1 space-y-1">
+                                            <h3 className="font-bold text-gray-900 group-hover:text-primary transition-colors line-clamp-1">{prod.nome}</h3>
+                                            <p className="text-[11px] text-gray-400 line-clamp-2 h-8 leading-relaxed">{prod.descricao || 'Sem descrição cadastrada.'}</p>
+                                            <p className="text-xl font-black italic tracking-tighter" style={{ color: store.cor_primaria }}>R$ {prod.preco}</p>
+                                        </div>
+                                        {prod.imagem ? (
+                                            <div className="w-24 h-24 rounded-3xl overflow-hidden shadow-lg border-2 border-white group-hover:rotate-3 transition-transform">
+                                                <img src={getImageUrl(prod.imagem)} alt={prod.nome} className="w-full h-full object-cover" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-24 h-24 rounded-3xl bg-gray-50 flex items-center justify-center text-gray-200">
+                                                <ShoppingBag size={32} />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                </main>
+
+                {/* Sticky Footers (Alternative CTAs) */}
+                <div className="fixed bottom-0 left-0 right-0 p-6 flex flex-col gap-3 pointer-events-none z-50">
+                    {/* Cart Button (If items exist) */}
+                    {cart.length > 0 ? (
+                        <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
+                            <button
+                                onClick={() => setIsCartOpen(true)}
+                                className="w-full max-w-md text-white px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group"
+                                style={{ backgroundColor: store.cor_primaria }}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white rounded-2xl w-8 h-8 flex items-center justify-center text-sm font-black italic shadow-lg" style={{ color: store.cor_primaria }}>
+                                        {cart.reduce((s, i) => s + i.quantidade, 0)}
+                                    </div>
+                                    <span className="font-black uppercase italic tracking-widest text-sm">Ver Sacola</span>
+                                </div>
+                                <span className="font-black text-xl italic tracking-tighter">R$ {total.toFixed(2)}</span>
+                            </button>
+                        </div>
+                    ) : (
+                        /* Default WhatsApp Action (Always visible if cart is empty) */
+                        <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
+                            <button
+                                onClick={() => window.open(`https://wa.me/${formatWhatsappNumber(store.whatsapp)}`)}
+                                className="w-full max-w-md bg-white text-gray-900 border-b-4 px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group font-black uppercase italic tracking-tighter text-sm"
+                                style={{ borderBottomColor: store.cor_primaria }}
+                            >
+                                <span>Dúvidas? Chame no WhatsApp</span>
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-500 text-white animate-pulse">
+                                    <ShoppingBag size={18} />
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Cart Drawer */}
+                {
+                    isCartOpen && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end transition-all">
+                            <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-slide-left rounded-l-[3rem] overflow-hidden">
+
+                                {/* Drawer Header */}
+                                <div className="p-8 border-b flex justify-between items-center bg-gray-50/50">
+                                    <div className="space-y-1">
+                                        <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none">
+                                            {view === 'cart' ? 'Sua Sacola' : 'Finalizar Pedido'}
+                                        </h2>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                            {view === 'cart' ? 'Confirme seus itens' : 'Informe seus dados'}
+                                        </p>
+                                    </div>
+                                    <button onClick={() => { setIsCartOpen(false); setView('cart'); }} className="p-3 bg-white shadow-sm hover:bg-gray-100 rounded-full transition-all active:scale-90">
+                                        <X size={28} />
+                                    </button>
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                                    {view === 'cart' ? (
+                                        <>
+                                            {cart.map(item => (
+                                                <div key={item.id} className="flex gap-5 p-6 rounded-[2.5rem] border-2 border-gray-50 hover:border-primary/10 transition-colors relative group">
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <h4 className="font-black text-lg text-gray-900 uppercase italic tracking-tight">{item.quantidade}x {item.nome}</h4>
+                                                            <button onClick={() => removeFromCart(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                                                                <X size={20} />
+                                                            </button>
+                                                        </div>
+                                                        {item.atributos.map(a => (
+                                                            <p key={a.opcaoId} className="text-xs font-bold text-gray-400 mt-0.5">• {a.nome}</p>
+                                                        ))}
+                                                        <p className="font-black text-xl italic tracking-tighter mt-3" style={{ color: store.cor_primaria }}>
+                                                            {formatCurrency((item.precoBase + item.atributos.reduce((s, a) => s + a.preco, 0)) * item.quantidade)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {cart.length === 0 && (
+                                                <div className="text-center py-40 space-y-4 opacity-30 select-none">
+                                                    <ShoppingBag size={80} className="mx-auto" />
+                                                    <p className="text-xl font-black uppercase italic tracking-tighter">Sacola Vazia</p>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="space-y-6 animate-slide-up">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Seu Nome</label>
+                                                <input
+                                                    type="text"
+                                                    value={checkoutData.nome}
+                                                    onChange={(e) => setCheckoutData({ ...checkoutData, nome: e.target.value })}
+                                                    className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                    placeholder="Ex: João Silva"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Telefone (WhatsApp)</label>
+                                                <input
+                                                    type="tel"
+                                                    value={checkoutData.telefone}
+                                                    onChange={(e) => setCheckoutData({ ...checkoutData, telefone: e.target.value })}
+                                                    className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                    placeholder="Ex: 11999999999"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
+                                                <textarea
+                                                    value={checkoutData.endereco}
+                                                    onChange={(e) => setCheckoutData({ ...checkoutData, endereco: e.target.value })}
+                                                    className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300 min-h-[100px]"
+                                                    placeholder="Rua, Número, Bairro, Complemento..."
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Forma de Pagamento</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map((method) => (
+                                                        <button
+                                                            key={method}
+                                                            onClick={() => setCheckoutData({ ...checkoutData, pagamento: method as PaymentMethod })}
+                                                            className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.pagamento === method
+                                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                                                                }`}
+                                                        >
+                                                            {method}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {checkoutData.pagamento === 'DINHEIRO' && (
+                                                <div className="space-y-2 animate-slide-up">
+                                                    <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Troco para quanto?</label>
+                                                    <input
+                                                        type="text"
+                                                        value={checkoutData.troco}
+                                                        onChange={(e) => setCheckoutData({ ...checkoutData, troco: e.target.value })}
+                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                        placeholder="Ex: R$ 50,00 ou Não preciso"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className="bg-blue-50 p-6 rounded-[2rem] space-y-2 mt-4">
+                                                <div className="flex justify-between text-gray-500 text-sm font-bold">
+                                                    <span>Subtotal</span>
+                                                    <span>{formatCurrency(total)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-gray-500 text-sm font-bold">
+                                                    <span>Taxa de Entrega</span>
+                                                    <span>A combinar</span>
+                                                </div>
+                                                <div className="h-[1px] bg-blue-100 my-2"></div>
+                                                <div className="flex justify-between text-2xl font-black text-blue-900">
+                                                    <span>Total</span>
+                                                    <span>{formatCurrency(total)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer Action */}
+                                <div className="p-8 bg-gray-50/80 backdrop-blur border-t space-y-6">
+                                    {view === 'cart' ? (
+                                        <>
+                                            <div className="flex justify-between items-end">
+                                                <span className="font-black text-xs text-gray-400 uppercase tracking-widest">Valor do Pedido</span>
+                                                <span className="font-black text-4xl italic tracking-tighter" style={{ color: store.cor_primaria }}>{formatCurrency(total)}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setView('checkout')}
+                                                disabled={cart.length === 0}
+                                                className="w-full py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xl italic uppercase tracking-tighter shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                                            >
+                                                CONTINUAR
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex gap-4">
+                                            <button
+                                                onClick={() => setView('cart')}
+                                                className="px-6 py-6 bg-white text-gray-900 border-2 border-gray-200 rounded-[2rem] font-black text-lg shadow-sm hover:bg-gray-50 transition-all uppercase tracking-tight"
+                                            >
+                                                Voltar
+                                            </button>
+                                            <button
+                                                onClick={handleSubmitOrder}
+                                                disabled={isSubmitting}
+                                                className="flex-1 py-6 bg-green-500 text-white rounded-[2rem] font-black text-xl italic uppercase tracking-tighter shadow-xl shadow-green-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                                            >
+                                                {isSubmitting ? 'ENVIANDO...' : 'ENVIAR PEDIDO'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Product Selection Modal */}
+                {selectedProduct && (
+                    <ProductModal
+                        isOpen={!!selectedProduct}
+                        product={selectedProduct}
+                        storeColor={store.cor_primaria}
+                        onClose={() => setSelectedProduct(null)}
+                        onAddToCart={(item) => {
+                            addToCart(item);
+                            setIsCartOpen(true);
+                            setSelectedProduct(null);
+                        }}
+                    />
+                )}
+            </div>
+        </div>
+    );
+}

@@ -1,0 +1,1 @@
+Validated Data: {'itens': [{'quantidade': 1, 'preco_unitario': Decimal('50.00'), 'selecoes': [], 'produto': <Produto: Massa de Bacon com Mussarela>}], 'cliente_nome': 'Test User', 'cliente_whatsapp': '123456789', 'endereco': 'Rua Teste', 'total': Decimal('50.00'), 'forma_pagamento': 'PIX', 'loja': <ConfiguracaoLoja: Loja rDs>}
