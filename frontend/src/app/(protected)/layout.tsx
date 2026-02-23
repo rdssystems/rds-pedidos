@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { BillingProvider } from '@/context/BillingContext';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { usePathname } from 'next/navigation';
 
 export default function ProtectedLayout({
     children,
@@ -11,8 +10,10 @@ export default function ProtectedLayout({
     children: React.ReactNode;
 }) {
     return (
-        <AdminLayout>
-            {children}
-        </AdminLayout>
+        <BillingProvider>
+            <AdminLayout>
+                {children}
+            </AdminLayout>
+        </BillingProvider>
     );
 }

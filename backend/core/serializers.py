@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa
+from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile
 
 import json
 
@@ -23,10 +23,43 @@ class FlexibleJSONField(serializers.Field):
     def to_representation(self, value):
         return value
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['is_verified']
+
 class UserSerializer(serializers.ModelSerializer):
+    roles = serializers.SerializerMethodField()
+    profile = UserProfileSerializer(read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'roles', 'profile']
+
+    def get_roles(self, obj):
+        roles_data = []
+        
+        # 1. Stores where user is the Owner
+        for s in obj.lojas.all():
+            roles_data.append({
+                'id': s.id,
+                'store_name': s.nome,
+                'store_slug': s.slug,
+                'role': 'owner'
+            })
+            
+        # 2. Stores where user is a team member
+        for p in obj.perfis_lojas.select_related('loja').all():
+            # Avoid duplicate if already added as owner
+            if not any(r['id'] == p.loja.id for r in roles_data):
+                roles_data.append({
+                    'id': p.loja.id,
+                    'store_name': p.loja.nome,
+                    'store_slug': p.loja.slug,
+                    'role': p.role
+                })
+                
+        return roles_data
 
 class PerfilUsuarioLojaSerializer(serializers.ModelSerializer):
     user_details = UserSerializer(source='user', read_only=True)

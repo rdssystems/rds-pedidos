@@ -42,6 +42,7 @@ def notify_order_change(sender, instance, created, **kwargs):
         'status': instance.status,
         'cliente_nome': instance.cliente_nome,
         'total': str(instance.total),
+        'tipo': instance.tipo,
         'created': created
     }
     
@@ -58,6 +59,12 @@ def notify_order_change(sender, instance, created, **kwargs):
     
     # Send WhatsApp Notification on Status Change
     if not created and instance.cliente_whatsapp and instance.loja.evolution_instance:
+        # Check if the plan allows WhatsApp automation
+        recursos = instance.loja.plano.recursos if instance.loja.plano else {}
+        if not recursos.get('whatsapp_automation'):
+            logger.info(f"WhatsApp automation disabled for plan {instance.loja.plano.nome if instance.loja.plano else 'None'}")
+            return
+
         msg = None
         
         # Context for placeholders
@@ -78,7 +85,30 @@ def notify_order_change(sender, instance, created, **kwargs):
         if msg:
             send_whatsapp_message(instance.cliente_whatsapp, msg, instance.loja.evolution_instance)
 
-from .models import Produto
+from django.contrib.auth.models import User
+from .models import Produto, ConfiguracaoLoja, Plano, UserProfile
+from django.utils import timezone
+from datetime import timedelta
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
+
+@receiver(post_save, sender=ConfiguracaoLoja)
+def setup_new_store_trial(sender, instance, created, **kwargs):
+    if created:
+        try:
+            # All new stores start with 3 days of PRO Trial (replaces Elite)
+            pro_plan = Plano.objects.filter(nome='PRO').first()
+            if pro_plan:
+                instance.plano = pro_plan
+                instance.status_assinatura = 'trial'
+                instance.valido_ate = timezone.now() + timedelta(days=3)
+                instance.save()
+                logger.info(f"Trial de 3 dias (PRO) configurado para a loja: {instance.nome}")
+        except Exception as e:
+            logger.error(f"Erro ao configurar trial para nova loja: {e}")
 
 @receiver(post_save, sender=Produto)
 def notify_stock_change(sender, instance, created, **kwargs):

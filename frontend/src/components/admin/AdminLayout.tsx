@@ -15,17 +15,71 @@ import {
     MessageSquare,
     LayoutGrid,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    AlertTriangle
 } from 'lucide-react';
 
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { useBilling } from '@/context/BillingContext';
+
 export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
-    const { logout, user, loading } = useAuth();
+    const { logout, user } = useAuth();
+    const { store } = useBilling();
     const pathname = usePathname();
     const [isMinimized, setIsMinimized] = React.useState(false);
+    const [closingAlert, setClosingAlert] = React.useState<string | null>(null);
+
+    // Get all unique roles user has across all stores (simplified for now)
+    const userRoles = user?.roles?.map(r => r.role) || [];
+
+    React.useEffect(() => {
+        if (!store?.horario_funcionamento) return;
+
+        const checkClosingTime = () => {
+            const now = new Date();
+            const days = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+            const todayStr = days[now.getDay()];
+
+            const todayConfig = store.horario_funcionamento[todayStr];
+            if (!todayConfig || !todayConfig.close || todayConfig.closed) {
+                setClosingAlert(null);
+                return;
+            }
+
+            const [closeH, closeM] = todayConfig.close.split(':').map(Number);
+            const closeTime = new Date();
+            closeTime.setHours(closeH, closeM, 0, 0);
+
+            // If close time is past midnight (e.g. 02:00) and current time is late night (e.g. 23:40)
+            if (closeH <= 6 && now.getHours() >= 18) {
+                closeTime.setDate(closeTime.getDate() + 1);
+            }
+
+            // Also if close time is today (02:00) and it's already 02:10, realDiffMins will be -10
+
+            const realDiffMs = closeTime.getTime() - now.getTime();
+            const realDiffMins = Math.floor(realDiffMs / 60000);
+
+            const canManageBox = userRoles.includes('owner') || userRoles.includes('manager') || userRoles.includes('cashier');
+
+            if (canManageBox && realDiffMins <= 30 && realDiffMins >= -30) {
+                setClosingAlert(
+                    realDiffMins > 0
+                        ? `Faltam ${realDiffMins} minutos para o horário de fechamento configurado. Não esqueça de fechar o caixa!`
+                        : `O horário de fechamento já passou. Não esqueça de fechar o caixa!`
+                );
+            } else {
+                setClosingAlert(null);
+            }
+        };
+
+        checkClosingTime();
+        const interval = setInterval(checkClosingTime, 60000);
+        return () => clearInterval(interval);
+    }, [store?.horario_funcionamento, userRoles]);
 
     // Don't show sidebar on login page
     if (pathname === '/login') {
@@ -34,33 +88,49 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
     const menuItems = [
         { label: 'Resumo', icon: LayoutDashboard, href: '/dashboard', roles: ['owner', 'manager'] },
-        { label: 'Atendimento', icon: LayoutGrid, href: '/mesas', roles: ['owner', 'manager', 'waiter'] },
+        { label: 'Atendimento', icon: LayoutGrid, href: '/mesas', roles: ['owner', 'manager', 'waiter'], plan: ['PRO'] },
         { label: 'Pedidos', icon: ShoppingBag, href: '/orders', roles: ['owner', 'manager', 'waiter', 'kitchen', 'driver', 'cashier'] },
-        { label: 'Caixa (PDV)', icon: CreditCard, href: '/pos', roles: ['owner', 'manager', 'cashier'] },
+        { label: 'Caixa (PDV)', icon: CreditCard, href: '/pos', roles: ['owner', 'manager', 'cashier'], plan: ['Basic', 'PRO'] },
         { label: 'Cardápio', icon: UtensilsCrossed, href: '/menu', roles: ['owner', 'manager'] },
-        { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'] },
-        { label: 'WhatsApp', icon: MessageSquare, href: '/settings/whatsapp', roles: ['owner', 'manager'] },
+        { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'], plan: ['PRO'] },
+        { label: 'WhatsApp', icon: MessageSquare, href: '/settings/whatsapp', roles: ['owner', 'manager'], plan: ['PRO'] },
         { label: 'Assinatura', icon: CreditCard, href: '/settings/billing', roles: ['owner'] },
         { label: 'Configurações', icon: Settings, href: '/settings', roles: ['owner', 'manager'] },
     ];
 
-    // Get all unique roles user has across all stores (simplified for now)
-    const userRoles = user?.roles?.map(r => r.role) || [];
-
     // Determine the "primary" role label to show
     const getRoleLabel = () => {
+        if (userRoles.includes('driver')) return 'Entregador';
         if (userRoles.includes('owner')) return 'Proprietário';
         if (userRoles.includes('manager')) return 'Gerente';
         if (userRoles.includes('cashier')) return 'Op. de Caixa';
         if (userRoles.includes('waiter')) return 'Atendente';
         if (userRoles.includes('kitchen')) return 'Cozinha';
-        if (userRoles.includes('driver')) return 'Entregador';
         return 'Membro';
     };
 
-    const filteredMenuItems = menuItems.filter(item =>
-        item.roles.some(role => userRoles.includes(role as any))
-    );
+    const currentPlan = store?.plano_details?.nome;
+    const isSubscriptionActive = store?.status_assinatura === 'active' || store?.status_assinatura === 'trial';
+
+    const filteredMenuItems = menuItems.filter(item => {
+        // 1. Check Roles
+        const hasRole = item.roles.some(role => userRoles.includes(role as any));
+        if (!hasRole) return false;
+
+        // 2. Check Plan Requirements
+        // Give trial accounts access to all plan features to let them evaluate the full platform
+        if (item.plan && !item.plan.includes(currentPlan as any) && store?.status_assinatura !== 'trial') {
+            return false;
+        }
+
+        // 3. Check Subscription Status (Only block operational screens if inactive)
+        // Allow billing and settings even if inactive
+        if (!isSubscriptionActive && !['Assinatura', 'Configurações'].includes(item.label)) {
+            return false;
+        }
+
+        return true;
+    });
 
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row">
@@ -70,7 +140,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                     <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
                         <ChefHat size={18} />
                     </div>
-                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase">Admin</h1>
+                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase">{store?.nome || 'Admin'}</h1>
                 </div>
                 <button
                     onClick={logout}
@@ -91,7 +161,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                             {!isMinimized && (
                                 <div className="flex flex-col overflow-hidden">
                                     <h1 className="text-xl font-black text-[#0f172a] italic tracking-tighter uppercase leading-none truncate">
-                                        {user?.roles?.[0]?.store_name || 'Admin'}
+                                        {store?.nome || 'Admin'}
                                     </h1>
                                     <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Painel Gestão</span>
                                 </div>
@@ -161,6 +231,15 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-h-screen md:h-screen overflow-hidden">
+                {closingAlert && (
+                    <div className="bg-orange-500 text-white px-4 py-3 flex items-center justify-center gap-3 font-bold text-sm shadow-md z-50 animate-slide-down sticky top-0 md:relative">
+                        <AlertTriangle size={18} className="animate-pulse" />
+                        <span>{closingAlert}</span>
+                        <Link href="/pos" className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors ml-4 uppercase tracking-widest hidden sm:block">
+                            Ver Caixa
+                        </Link>
+                    </div>
+                )}
                 <main className="flex-1 overflow-y-auto overflow-x-hidden">
                     {children}
                 </main>

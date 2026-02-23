@@ -8,18 +8,11 @@ interface Pedido {
     total: string;
     status: string;
     criado_em: string;
+    numero_diario: number;
+    tipo: string;
 }
 
 import { ArrowRight, CheckCheck } from 'lucide-react';
-
-interface Pedido {
-    id: number;
-    cliente_nome: string;
-    total: string;
-    status: string;
-    criado_em: string;
-    numero_diario: number;
-}
 
 export const PedidoCard = ({ pedido, onVerPedido, onAvançar }: { pedido: Pedido, onVerPedido: (id: number) => void, onAvançar: () => any }) => {
     const [isDelayed, setIsDelayed] = useState(false);
@@ -67,7 +60,13 @@ export const PedidoCard = ({ pedido, onVerPedido, onAvançar }: { pedido: Pedido
                 </span>
             </div>
 
-            <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{pedido.cliente_nome}</h3>
+            <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-gray-800 text-lg leading-tight truncate">{pedido.cliente_nome}</h3>
+                {pedido.tipo === 'ENTREGA' && <span className="text-[8px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Entrega</span>}
+                {pedido.tipo === 'BALCAO' && <span className="text-[8px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Balcão</span>}
+                {pedido.tipo === 'RETIRADA' && <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Retirada</span>}
+                {pedido.tipo === 'MESA' && <span className="text-[8px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Mesa</span>}
+            </div>
             <p className="text-sm font-black text-gray-400 mb-4">R$ {pedido.total}</p>
 
             <div className="flex gap-2">

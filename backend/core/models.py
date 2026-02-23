@@ -5,6 +5,15 @@ from PIL import Image
 from io import BytesIO
 import os
 from django.core.files.base import ContentFile
+import uuid
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    is_verified = models.BooleanField(default=False)
+    verification_token = models.CharField(max_length=100, blank=True, null=True)
+    
+    def __str__(self):
+        return f"Profile of {self.user.username}"
 
 def resize_image(image_field, max_size, quality=85):
     if not image_field:
@@ -201,6 +210,7 @@ class Pedido(models.Model):
         ('ENTREGA', 'Entrega'),
         ('RETIRADA', 'Retirada'),
         ('MESA', 'Mesa'),
+        ('BALCAO', 'Balcão'),
     ]
     loja = models.ForeignKey(ConfiguracaoLoja, on_delete=models.CASCADE)
     cliente_nome = models.CharField(max_length=255)
@@ -212,6 +222,7 @@ class Pedido(models.Model):
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='ENTREGA')
     mesa = models.PositiveIntegerField(null=True, blank=True)
     numero_diario = models.PositiveIntegerField(null=True, blank=True)
+    observacoes = models.TextField(blank=True, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):

@@ -17,6 +17,8 @@ interface CartItem {
     precoUnitario: number;
     quantidade: number;
     total: number;
+    selecoes?: any[];
+    observacoes?: string;
 }
 
 interface PosContextType {
@@ -29,11 +31,12 @@ interface PosContextType {
     fecharCaixa: (saldoFinal: number) => Promise<void>;
     refreshCaixa: () => Promise<void>;
     refreshProducts: () => Promise<void>;
-    addToCart: (product: any) => void;
+    addToCart: (product: any, selecoes?: any[], observacoes?: string) => void;
     removeFromCart: (uuid: string) => void;
     clearCart: () => void;
     checkout: (paymentMethod: string, amountPaid: number, cliente?: any) => Promise<any>;
     loadTableOrders: (mesaNum: number) => Promise<void>;
+    sendToKitchen: (clientInfo?: any, orderObs?: string) => Promise<any>;
 }
 
 const PosContext = createContext<PosContextType>({} as PosContextType);
@@ -196,22 +199,38 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         setCaixa(null);
     };
 
-    const addToCart = (product: any) => {
+    const addToCart = (product: any, selecoes: any[] = [], observacoes: string = '') => {
         setCart(prev => {
-            const existing = prev.find(p => p.produtoId === product.id);
+            // Check if exact same item (product + attributes + obs) already in cart
+            const existing = prev.find(p =>
+                p.produtoId === product.id &&
+                JSON.stringify(p.selecoes) === JSON.stringify(selecoes) &&
+                p.observacoes === observacoes
+            );
+
             if (existing) {
-                return prev.map(p => p.produtoId === product.id
+                return prev.map(p => p.uuid === existing.uuid
                     ? { ...p, quantidade: p.quantidade + 1, total: (p.precoUnitario * (p.quantidade + 1)) }
                     : p
                 );
             }
+
+            // Calculate extra price from selecoes
+            let finalPrice = parseFloat(product.preco);
+            if (selecoes && selecoes.length > 0) {
+                const extras = selecoes.reduce((acc, sel) => acc + (parseFloat(sel.preco) || 0), 0);
+                finalPrice += extras;
+            }
+
             return [...prev, {
                 produtoId: product.id,
                 uuid: crypto.randomUUID(),
                 nome: product.nome,
-                precoUnitario: parseFloat(product.preco),
+                precoUnitario: finalPrice,
                 quantidade: 1,
-                total: parseFloat(product.preco)
+                total: finalPrice,
+                selecoes,
+                observacoes
             }];
         });
     };
@@ -222,7 +241,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
 
     const clearCart = () => setCart([]);
 
-    const checkout = async (paymentMethod: string, amountPaid: number, cliente: any = null) => {
+    const checkout = async (paymentMethod: string, amountPaid: number, cliente: any = null, orderObs: string = '') => {
         if (!caixa) throw new Error("Caixa fechado");
         const storeId = localStorage.getItem('activeStoreId');
         const token = localStorage.getItem('token');
@@ -233,11 +252,13 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
             valor: total,
             total_pago: amountPaid,
             mesa_orders: activeMesaOrders,
+            observacoes: orderObs,
             itens: cart.map(item => ({
                 produto: item.produtoId,
                 quantidade: item.quantidade,
                 preco_unitario: item.precoUnitario,
-                selecoes: []
+                selecoes: item.selecoes || [],
+                observacoes: item.observacoes || ''
             })),
             cliente_nome: cliente?.nome || (activeMesaNum ? `Mesa ${activeMesaNum}` : 'Consumidor Final'),
             cliente_whatsapp: cliente?.whatsapp || ''
@@ -298,11 +319,80 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const sendToKitchen = async (clientInfo: any = null, orderObs: string = '') => {
+        let storeId = localStorage.getItem('activeStoreId');
+        const token = localStorage.getItem('token');
+
+        // Robust storeId fallback if missing
+        if (!storeId) {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                const userData = JSON.parse(userStr);
+                if (userData.roles?.length > 0) {
+                    storeId = String(userData.roles[0].id);
+                    localStorage.setItem('activeStoreId', storeId);
+                }
+            }
+        }
+
+        if (!storeId) throw new Error('Loja não identificada. Por favor, recarregue a página.');
+
+        const payload = {
+            loja: parseInt(storeId),
+            itens: cart.map(item => ({
+                produto: item.produtoId,
+                quantidade: item.quantidade,
+                preco_unitario: item.precoUnitario,
+                selecoes: item.selecoes || [],
+                observacoes: item.observacoes || ''
+            })),
+            observacoes: orderObs,
+            cliente_nome: clientInfo?.nome || 'Consumidor Final',
+            cliente_whatsapp: clientInfo?.whatsapp || '',
+            total: total,
+            tipo: 'BALCAO',
+            status: 'NOVO',
+            forma_pagamento: 'PIX'
+        };
+
+        const res = await fetch('/api/pedidos/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            console.error('Order creation error:', err);
+
+            // Extract error message from DRF error format
+            let errorMessage = 'Erro ao realizar o pedido.';
+            if (err.detail) errorMessage = err.detail;
+            else if (typeof err === 'object') {
+                const firstKey = Object.keys(err)[0];
+                const firstVal = err[firstKey];
+                errorMessage = Array.isArray(firstVal) ? firstVal[0] : String(firstVal);
+                if (firstKey !== 'non_field_errors' && firstKey !== 'detail') {
+                    errorMessage = `${firstKey}: ${errorMessage}`;
+                }
+            }
+
+            throw new Error(errorMessage);
+        }
+
+        const data = await res.json();
+        clearCart();
+        return data;
+    };
+
     return (
         <PosContext.Provider value={{
             caixa, isLoading, cart, total, products,
             abrirCaixa, fecharCaixa, refreshCaixa: fetchCaixa, refreshProducts: fetchProducts,
-            addToCart, removeFromCart, clearCart, checkout, loadTableOrders
+            addToCart, removeFromCart, clearCart, checkout, loadTableOrders, sendToKitchen
         }}>
             {children}
         </PosContext.Provider>

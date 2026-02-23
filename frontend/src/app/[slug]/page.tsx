@@ -41,7 +41,9 @@ export default function PublicMenuPage() {
     const [checkoutData, setCheckoutData] = useState({
         nome: '',
         telefone: '',
-        endereco: '',
+        endereco_rua: '',
+        endereco_numero: '',
+        endereco_bairro: '',
         pagamento: 'PIX' as PaymentMethod,
         troco: ''
     });
@@ -168,10 +170,32 @@ export default function PublicMenuPage() {
             return;
         }
 
-        if (!checkoutData.nome || !checkoutData.telefone || !checkoutData.endereco) {
-            alert('Por favor, preencha todos os campos obrigatórios.');
+        // WhatsApp Validation
+        const cleanPhone = checkoutData.telefone.replace(/\D/g, '');
+        if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+            alert('Por favor, informe um número de Whatsapp válido (10 ou 11 dígitos, ex: 11999999999).');
             return;
         }
+
+        if (!checkoutData.nome || !checkoutData.telefone || !checkoutData.endereco_rua || !checkoutData.endereco_numero || !checkoutData.endereco_bairro) {
+            alert('Por favor, preencha todos os campos obrigatórios (Nome, Whatsapp e Endereço completo).');
+            return;
+        }
+
+        // Change Verification
+        if (checkoutData.pagamento === 'DINHEIRO' && checkoutData.troco) {
+            const trocoValor = parseFloat(checkoutData.troco.replace('R$', '').replace('.', '').replace(',', '.').trim());
+            if (isNaN(trocoValor)) {
+                alert('Valor de troco inválido.');
+                return;
+            }
+            if (trocoValor < total) {
+                alert(`O valor para troco (R$ ${trocoValor.toFixed(2)}) não pode ser menor que o total do pedido (R$ ${total.toFixed(2)}).`);
+                return;
+            }
+        }
+
+        const fullAddress = `${checkoutData.endereco_rua}, ${checkoutData.endereco_numero} - ${checkoutData.endereco_bairro}`;
 
         setIsSubmitting(true);
 
@@ -181,7 +205,7 @@ export default function PublicMenuPage() {
                 loja: store.id,
                 cliente_nome: checkoutData.nome,
                 cliente_whatsapp: checkoutData.telefone,
-                endereco: checkoutData.endereco,
+                endereco: fullAddress,
                 total: total,
                 forma_pagamento: checkoutData.pagamento,
                 itens: cart.map(item => ({
@@ -230,7 +254,7 @@ export default function PublicMenuPage() {
                 message += `\n`;
             });
 
-            message += `📍 *ENTREGA:*\n${checkoutData.endereco}\n\n`;
+            message += `📍 *ENTREGA:*\n${fullAddress}\n\n`;
 
             message += `💳 *PAGAMENTO:*\n`;
             message += `Forma: ${checkoutData.pagamento}\n`;
@@ -247,11 +271,18 @@ export default function PublicMenuPage() {
             const cleanPhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
             window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
 
-            // Cleanup
             clearCart();
             setIsCartOpen(false);
             setView('cart');
-            setCheckoutData({ nome: '', telefone: '', endereco: '', pagamento: 'PIX', troco: '' });
+            setCheckoutData({
+                nome: '',
+                telefone: '',
+                endereco_rua: '',
+                endereco_numero: '',
+                endereco_bairro: '',
+                pagamento: 'PIX',
+                troco: ''
+            });
             alert('Pedido enviado com sucesso!');
 
         } catch (error) {
@@ -502,19 +533,54 @@ export default function PublicMenuPage() {
                                                 <input
                                                     type="tel"
                                                     value={checkoutData.telefone}
-                                                    onChange={(e) => setCheckoutData({ ...checkoutData, telefone: e.target.value })}
+                                                    onChange={(e) => {
+                                                        // Allow only numbers
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        setCheckoutData({ ...checkoutData, telefone: val });
+                                                    }}
                                                     className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                    placeholder="Ex: 11999999999"
+                                                    placeholder="11999999999"
+                                                    maxLength={11}
                                                 />
+                                                <p className="text-[10px] text-gray-400 font-bold ml-2">Apenas números (DDD + Número)</p>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
-                                                <textarea
-                                                    value={checkoutData.endereco}
-                                                    onChange={(e) => setCheckoutData({ ...checkoutData, endereco: e.target.value })}
-                                                    className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300 min-h-[100px]"
-                                                    placeholder="Rua, Número, Bairro, Complemento..."
-                                                />
+
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
+
+                                                    {/* Rua */}
+                                                    <input
+                                                        type="text"
+                                                        value={checkoutData.endereco_rua}
+                                                        onChange={(e) => setCheckoutData({ ...checkoutData, endereco_rua: e.target.value })}
+                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                        placeholder="Rua / Avenida"
+                                                    />
+
+                                                    <div className="flex gap-4">
+                                                        {/* Number */}
+                                                        <div className="flex-1">
+                                                            <input
+                                                                type="text"
+                                                                value={checkoutData.endereco_numero}
+                                                                onChange={(e) => setCheckoutData({ ...checkoutData, endereco_numero: e.target.value })}
+                                                                className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                                placeholder="Número"
+                                                            />
+                                                        </div>
+                                                        {/* Neighborhood */}
+                                                        <div className="flex-[2]">
+                                                            <input
+                                                                type="text"
+                                                                value={checkoutData.endereco_bairro}
+                                                                onChange={(e) => setCheckoutData({ ...checkoutData, endereco_bairro: e.target.value })}
+                                                                className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                                placeholder="Bairro"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div className="space-y-2">
@@ -541,9 +607,12 @@ export default function PublicMenuPage() {
                                                     <input
                                                         type="text"
                                                         value={checkoutData.troco}
-                                                        onChange={(e) => setCheckoutData({ ...checkoutData, troco: e.target.value })}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                                            setCheckoutData({ ...checkoutData, troco: val });
+                                                        }}
                                                         className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                        placeholder="Ex: R$ 50,00 ou Não preciso"
+                                                        placeholder="Ex: 50.00"
                                                     />
                                                 </div>
                                             )}
@@ -615,7 +684,7 @@ export default function PublicMenuPage() {
                         onClose={() => setSelectedProduct(null)}
                         onAddToCart={(item) => {
                             addToCart(item);
-                            setIsCartOpen(true);
+                            // setIsCartOpen(true); // Disable auto-open
                             setSelectedProduct(null);
                         }}
                     />

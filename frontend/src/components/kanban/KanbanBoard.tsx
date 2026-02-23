@@ -61,9 +61,16 @@ export const KanbanBoard = () => {
                 if (!userRes.ok) return;
                 const userData = await userRes.json();
 
-                // Set role
-                if (userData.roles && userData.roles.length > 0) {
-                    setUserRole(userData.roles[0].role);
+                // Set role - Prioritize Owner/Manager
+                const roles = userData.roles || [];
+                // Check if user has any high-level role
+                const isManagerial = roles.some((r: any) => ['owner', 'manager', 'cashier'].includes(r.role));
+
+                if (isManagerial) {
+                    // Start with 'owner' effectively for UI purposes if they have any managerial role
+                    setUserRole('owner');
+                } else if (roles.length > 0) {
+                    setUserRole(roles[0].role);
                 }
 
                 // Assuming first owned store or role store
@@ -202,7 +209,11 @@ export const KanbanBoard = () => {
         // For now, let's allow live updates to appear at top, user will realize.
         if (lastMessage) {
             if (lastMessage.created) {
-                setPedidos(prev => [lastMessage, ...prev]);
+                setPedidos(prev => {
+                    const alreadyExists = prev.some(p => p.id === lastMessage.id);
+                    if (alreadyExists) return prev;
+                    return [lastMessage, ...prev];
+                });
                 playAlert();
             } else {
                 setPedidos(prev => prev.map(p =>
@@ -249,6 +260,14 @@ export const KanbanBoard = () => {
     };
 
     const handleAdvanceStatus = async (pedido: Pedido) => {
+        // Permission Check for Drivers
+        if (userRole === 'driver') {
+            if (pedido.status !== 'PRONTO' && pedido.status !== 'DESPACHADO') {
+                alert('Entregadores só podem mover pedidos Prontos ou em Entrega.');
+                return;
+            }
+        }
+
         const statusFlow: Record<string, string> = {
             'NOVO': 'PREPARO',
             'PREPARO': 'PRONTO',

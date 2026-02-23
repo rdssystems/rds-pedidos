@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,18 +9,23 @@ from django.utils.text import slugify
 from django.db.models import Q, Sum, Count
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa
+from decimal import Decimal
+from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile
 from .serializers import (
     StoreDetailSerializer, CategoriaSerializer, ProdutoSerializer,
     PedidoSerializer, FlexibleJSONField, GrupoDeAtributosSerializer,
     AtributoOpcaoSerializer, ItemPedidoSerializer, PerfilUsuarioLojaSerializer,
-    CaixaSerializer, MovimentacaoCaixaSerializer
+    CaixaSerializer, MovimentacaoCaixaSerializer, UserSerializer
 )
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
 from django.http import JsonResponse
-from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from .services import EvolutionService
 import json
+import uuid
 
 class HasActiveSubscription(permissions.BasePermission):
     message = "Esta loja não possui uma assinatura ativa."
@@ -60,38 +66,139 @@ class RegisterView(viewsets.ViewSet):
                     slug = f"{base_slug}-{counter}"
                     counter += 1
                 store = ConfiguracaoLoja.objects.create(owner=user, nome=store_name, slug=slug, ativa=True)
-                return Response({"message": "Conta e loja criadas com sucesso!", "store_slug": store.slug, "username": user.username}, status=status.HTTP_201_CREATED)
+                
+                # Create profile entry for owner consistency
+                PerfilUsuarioLoja.objects.create(user=user, loja=store, role='owner')
+                
+                # Send verification email
+                profile, _ = UserProfile.objects.get_or_create(user=user)
+                token = str(uuid.uuid4())
+                profile.verification_token = token
+                profile.save()
+                
+                verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+                subject = "Bem-vindo ao RDS Pedidos - Verifique seu E-mail"
+                message = f"Olá {user.first_name or user.username},\n\nObrigado por se cadastrar! Sua loja '{store.nome}' foi criada com sucesso.\n\nPor favor, confirme seu e-mail clicando no link abaixo:\n\n{verify_url}"
+                
+                try:
+                    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+                except Exception as e:
+                    logger.error(f"Erro ao enviar e-mail de boas-vindas: {e}")
+
+                return Response({"message": "Conta e loja criadas com sucesso! Verifique seu e-mail para ativar sua conta.", "store_slug": store.slug, "username": user.username}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UserViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['request_password_reset', 'confirm_password_reset', 'confirm_verification']:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
     @action(detail=False, methods=['get'])
     def me(self, request):
-        user = request.user
-        roles = PerfilUsuarioLoja.objects.filter(user=user)
-        owned_stores = ConfiguracaoLoja.objects.filter(owner=user)
-        roles_data = []
-        for p in roles:
-            roles_data.append({'id': p.loja.id, 'store_slug': p.loja.slug, 'store_name': p.loja.nome, 'role': p.role})
-        for s in owned_stores:
-            if not any(r['store_slug'] == s.slug for r in roles_data):
-                roles_data.append({'id': s.id, 'store_slug': s.slug, 'store_name': s.nome, 'role': 'owner'})
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='request-password-reset')
+    def request_password_reset(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "E-mail é obrigatório."}, status=400)
+            
+        user = User.objects.filter(email=email).first()
+        if user:
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # In a real app, this URL should point to your frontend
+            reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}" if hasattr(settings, 'FRONTEND_URL') else f"uid={uid}&token={token}"
+            
+            subject = "Recuperação de Senha - RDS Pedidos"
+            message = f"Olá {user.first_name or user.username},\n\nRecebemos uma solicitação para redefinir sua senha. Clique no link abaixo para prosseguir:\n\n{reset_url}\n\nSe você não solicitou isso, ignore este e-mail."
+            
+            try:
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+            except Exception as e:
+                return Response({"error": f"Erro ao enviar e-mail: {str(e)}"}, status=500)
+                
+        # Always return success to prevent email enumeration
+        return Response({"message": "Se este e-mail estiver cadastrado, você receberá um link de recuperação em instantes."})
+
+    @action(detail=False, methods=['post'], url_path='confirm-password-reset')
+    def confirm_password_reset(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('password')
         
-        return Response({
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'roles': roles_data
-        })
+        if not all([uidb64, token, new_password]):
+            return Response({"error": "Dados incompletos."}, status=400)
+            
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is not None and default_token_generator.check_token(user, token):
+            user.set_password(new_password)
+            user.save()
+            return Response({"message": "Senha alterada com sucesso!"})
+        else:
+            return Response({"error": "Link de recuperação inválido ou expirado."}, status=400)
+
+    @action(detail=False, methods=['post'], url_path='request-verification')
+    def request_verification(self, request):
+        user = request.user
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        
+        if profile.is_verified:
+            return Response({"message": "Seu e-mail já está verificado."})
+            
+        token = str(uuid.uuid4())
+        profile.verification_token = token
+        profile.save()
+        
+        verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}" if hasattr(settings, 'FRONTEND_URL') else f"token={token}"
+        
+        subject = "Verificação de E-mail - RDS Pedidos"
+        message = f"Olá {user.first_name or user.username},\n\nPor favor, confirme seu e-mail clicando no link abaixo:\n\n{verify_url}"
+        
+        try:
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+            return Response({"message": "E-mail de verificação enviado!"})
+        except Exception as e:
+            return Response({"error": f"Erro ao enviar e-mail: {str(e)}"}, status=500)
+
+    @action(detail=False, methods=['post'], url_path='confirm-verification')
+    def confirm_verification(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token é obrigatório."}, status=400)
+            
+        profile = UserProfile.objects.filter(verification_token=token).first()
+        if profile:
+            profile.is_verified = True
+            profile.verification_token = None
+            profile.save()
+            return Response({"message": "E-mail verificado com sucesso!"})
+        else:
+            return Response({"error": "Token inválido."}, status=400)
 
 class StoreViewSet(viewsets.ModelViewSet):
     queryset = ConfiguracaoLoja.objects.all()
     serializer_class = StoreDetailSerializer
     lookup_field = 'slug'
+    lookup_url_kwarg = 'slug'
     def get_permissions(self):
-        if self.action in ['list', 'create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [permissions.IsAuthenticated, HasActiveSubscription]
+        if self.action in ['list', 'create', 'update', 'partial_update', 'destroy', 'migrar_plano']:
+            permission_classes = [permissions.IsAuthenticated]
+            # HasActiveSubscription might block migrating if already expired, 
+            # so we only require IsAuthenticated for migration.
+            if self.action != 'migrar_plano':
+                permission_classes.append(HasActiveSubscription)
         else: permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
     def get_queryset(self):
@@ -139,6 +246,24 @@ class StoreViewSet(viewsets.ModelViewSet):
             store.save()
             return Response({"message": "Disconnected"})
         except Exception as e: return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='migrar-plano')
+    def migrar_plano(self, request, slug=None):
+        print(f"DEBUG: migrar_plano called for slug: {slug}", flush=True)
+        store = self.get_object()
+        print(f"DEBUG: Found store: {store.nome}", flush=True)
+        plano_id = request.data.get('plano_id')
+        if not plano_id: return Response({"error": "plano_id é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            plano = Plano.objects.get(id=plano_id)
+            store.plano = plano
+            store.status_assinatura = 'active'
+            store.valido_ate = timezone.now() + timedelta(days=30)
+            store.save()
+            return Response({"message": f"Plano {plano.nome} ativado com sucesso para testar."}, status=status.HTTP_200_OK)
+        except Plano.DoesNotExist:
+            return Response({"error": "Plano não encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
     def update(self, request, *args, **kwargs):
         if 'horario_funcionamento' in request.data and isinstance(request.data['horario_funcionamento'], str):
@@ -349,8 +474,8 @@ class CaixaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         # Users see shifts from stores they belong to
-        return Caixa.objects.filter(loja__owner=user).order_by('-data_abertura') | \
-               Caixa.objects.filter(loja__equipe__user=user).order_by('-data_abertura')
+        return (Caixa.objects.filter(loja__owner=user) | \
+               Caixa.objects.filter(loja__equipe__user=user)).distinct().order_by('-data_abertura')
 
     def perform_create(self, serializer):
         # Allow creating a shift manually if needed, but 'abrir' action is preferred
@@ -416,8 +541,8 @@ class CaixaViewSet(viewsets.ModelViewSet):
              return Response({'error': 'saldo_final is required'}, status=400)
 
         # Calculate expected based on transactions
-        total_entradas = caixa.movimentacoes.filter(tipo__in=['ABERTURA', 'VENDA', 'SUPRIMENTO']).aggregate(Sum('valor'))['valor__sum'] or 0
-        total_saidas = caixa.movimentacoes.filter(tipo__in=['SANGRIA']).aggregate(Sum('valor'))['valor__sum'] or 0
+        total_entradas = caixa.movimentacoes.filter(tipo__in=['ABERTURA', 'VENDA', 'SUPRIMENTO']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+        total_saidas = caixa.movimentacoes.filter(tipo__in=['SANGRIA']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
         
         caixa.saldo_final_esperado = total_entradas - total_saidas
         caixa.saldo_final_informado = saldo_informado
