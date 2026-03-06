@@ -23,6 +23,8 @@ interface Product {
     descricao: string;
     imagem: string | null;
     disponivel: boolean;
+    controlar_estoque: boolean;
+    estoque_atual: number;
 }
 
 interface Category {
