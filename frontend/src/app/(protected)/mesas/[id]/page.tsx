@@ -8,6 +8,8 @@ import {
     Trash2, CreditCard, Loader2, UtensilsCrossed,
     MessageSquare, CheckCircle2, Clock
 } from 'lucide-react';
+import { ProductModal } from '@/components/Menu/ProductModal';
+import { useBilling } from '@/context/BillingContext';
 
 const TableDetailPage = () => {
     const { user, loading } = useAuth();
@@ -23,6 +25,11 @@ const TableDetailPage = () => {
     // Simple Cart for Waiter
     const [cart, setCart] = useState<any[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Product Modal State
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const { store } = useBilling();
 
     const fetchTableData = async () => {
         setIsLoading(true);
@@ -63,13 +70,26 @@ const TableDetailPage = () => {
     }, [user, loading, mesaNum]);
 
     const addToCart = (product: any) => {
+        // This is called from the ProductModal handleConfirm
         setCart(prev => {
-            const existing = prev.find(item => item.id === product.id);
-            if (existing) {
-                return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+            // Check if exact same product with same attributes already in cart
+            const existingIndex = prev.findIndex(item =>
+                item.productId === product.productId &&
+                JSON.stringify(item.atributos) === JSON.stringify(product.atributos)
+            );
+
+            if (existingIndex > -1) {
+                const newCart = [...prev];
+                newCart[existingIndex].quantidade += product.quantidade;
+                return newCart;
             }
-            return [...prev, { ...product, quantity: 1 }];
+            return [...prev, product];
         });
+    };
+
+    const openProductModal = (product: any) => {
+        setSelectedProduct(product);
+        setIsModalOpen(true);
     };
 
     const removeFromCart = (id: number) => {
@@ -83,7 +103,11 @@ const TableDetailPage = () => {
             const token = localStorage.getItem('token');
             const storeId = localStorage.getItem('activeStoreId');
 
-            const total = cart.reduce((acc, item) => acc + (parseFloat(item.preco) * item.quantity), 0);
+            const total = cart.reduce((acc, item) => {
+                const base = item.precoBase || parseFloat(item.preco);
+                const addons = (item.atributos || []).reduce((a: number, b: any) => a + (b.preco || 0), 0);
+                return acc + ((base + addons) * item.quantidade);
+            }, 0);
 
             const payload = {
                 loja: storeId,
@@ -95,9 +119,10 @@ const TableDetailPage = () => {
                 mesa: parseInt(mesaNum as string),
                 status: 'NOVO',
                 itens: cart.map(item => ({
-                    produto: item.id,
-                    quantidade: item.quantity,
-                    preco_unitario: parseFloat(item.preco)
+                    produto: item.productId || item.id,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.precoBase || parseFloat(item.preco),
+                    selecoes: item.atributos || []
                 }))
             };
 
@@ -122,7 +147,11 @@ const TableDetailPage = () => {
         }
     };
 
-    const totalInCart = cart.reduce((acc, item) => acc + (parseFloat(item.preco) * item.quantity), 0);
+    const totalInCart = cart.reduce((acc, item) => {
+        const base = item.precoBase || parseFloat(item.preco);
+        const addons = (item.atributos || []).reduce((a: number, b: any) => a + (b.preco || 0), 0);
+        return acc + ((base + addons) * item.quantidade);
+    }, 0);
     const totalCurrentOrders = orders.reduce((acc, order) => acc + parseFloat(order.total), 0);
 
     const filteredProducts = products.filter(p => p.nome.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -214,7 +243,7 @@ const TableDetailPage = () => {
                                         {categoryProducts.map(product => (
                                             <button
                                                 key={product.id}
-                                                onClick={() => addToCart(product)}
+                                                onClick={() => openProductModal(product)}
                                                 className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center gap-2 text-center active:scale-[0.98] transition-all hover:border-primary/20 h-full"
                                             >
                                                 <div className="w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
@@ -258,8 +287,15 @@ const TableDetailPage = () => {
                                 {cart.map(item => (
                                     <div key={item.id} className="flex justify-between items-center bg-white/5 rounded-xl p-3">
                                         <div className="flex items-center gap-3">
-                                            <span className="font-black text-primary">{item.quantity}x</span>
-                                            <span className="font-bold text-sm line-clamp-1">{item.nome}</span>
+                                            <span className="font-black text-primary">{item.quantidade || item.quantity}x</span>
+                                            <div>
+                                                <span className="font-bold text-sm line-clamp-1">{item.nome}</span>
+                                                {item.atributos?.length > 0 && (
+                                                    <p className="text-[10px] text-gray-400 font-medium">
+                                                        {item.atributos.map((a: any) => a.nome).join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                         <button onClick={() => removeFromCart(item.id)} className="text-gray-500 hover:text-red-400 p-1">
                                             <Trash2 size={16} />
@@ -285,6 +321,15 @@ const TableDetailPage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {isModalOpen && selectedProduct && (
+                <ProductModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    product={selectedProduct}
+                    onAddToCart={addToCart}
+                    storeColor={store?.cor_primaria || '#f97316'}
+                />
             )}
         </div>
     );

@@ -1,0 +1,2 @@
+{'ifood_client_id': '6ca3b943-efbf-4d23-b788-ca1ba491f72b', 'ifood_client_secret': 'ci777q2nf5zmlcho2o5pez2rsyp4jhkiytz7v56grfb6vtsw34f955gt51cga2ioiw6961qb8bngoaqoibm3b7k12msp9uwl3ph', 'ifood_merchant_id': '3657881', 'ifood_active': True}
+Valid super: {'ifood_client_id': '6ca3b943-efbf-4d23-b788-ca1ba491f72b', 'ifood_client_secret': 'ci777q2nf5zmlcho2o5pez2rsyp4jhkiytz7v56grfb6vtsw34f955gt51cga2ioiw6961qb8bngoaqoibm3b7k12msp9uwl3ph', 'ifood_merchant_id': '3657881', 'ifood_active': True}

@@ -53,14 +53,26 @@ const TablesPage = () => {
     useEffect(() => {
         if (lastMessage) {
             console.log("TablesPage: Update received via socket, refreshing...");
-            fetchMesas();
+            // Non-blocking background refresh
+            const token = localStorage.getItem('token');
+            const storeId = localStorage.getItem('activeStoreId');
+            fetch(`/api/pedidos/mesas/?loja_id=${storeId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }).then(res => {
+                if (res.ok) return res.json();
+            }).then(data => {
+                if (data) setMesas(data);
+            }).catch(console.error);
         }
     }, [lastMessage]);
 
-    if (loading || isLoading && mesas.length === 0) {
+    if (loading || (isLoading && mesas.length === 0)) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <Loader2 className="animate-spin text-primary" size={48} />
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="animate-spin text-primary" size={48} />
+                    <p className="text-gray-400 font-bold animate-pulse text-xs uppercase tracking-widest">Carregando...</p>
+                </div>
             </div>
         );
     }

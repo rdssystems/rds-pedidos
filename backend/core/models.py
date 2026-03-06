@@ -60,7 +60,21 @@ class ConfiguracaoLoja(models.Model):
     horario_funcionamento = models.JSONField(default=dict, help_text="Ex: {'seg': '08:00-18:00'}")
     ativa = models.BooleanField(default=True)
     
+    # Delivery Config
+    tipo_taxa_entrega = models.CharField(
+        max_length=10, 
+        choices=[('FIXA', 'Taxa Fixa Única'), ('BAIRRO', 'Taxa por Bairro')],
+        default='FIXA'
+    )
+    taxa_entrega_fixa = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
     # SaaS Billing
+    PLANO_CHOICES = [
+        ('START', 'Plano Start'),
+        ('PRO', 'Plano Pro'),
+        ('ELITE', 'Plano Elite'),
+    ]
+    plano_tipo = models.CharField(max_length=20, choices=PLANO_CHOICES, default='START')
     plano = models.ForeignKey(Plano, on_delete=models.SET_NULL, null=True, blank=True)
     status_assinatura = models.CharField(
         max_length=20, 
@@ -68,10 +82,20 @@ class ConfiguracaoLoja(models.Model):
         default='trial'
     )
     valido_ate = models.DateTimeField(null=True, blank=True)
+    mp_preapproval_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID da Assinatura no Mercado Pago")
+    mp_plan_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID do Plano no Mercado Pago")
 
     # Evolution API (WhatsApp)
     evolution_instance = models.CharField(max_length=100, blank=True, null=True, help_text="Nome da instância na Evolution API")
     evolution_token = models.CharField(max_length=100, blank=True, null=True, help_text="Token da instância")
+
+    # iFood Integration
+    ifood_client_id = models.CharField(max_length=255, blank=True, null=True)
+    ifood_client_secret = models.CharField(max_length=255, blank=True, null=True)
+    ifood_merchant_id = models.CharField(max_length=100, blank=True, null=True)
+    ifood_active = models.BooleanField(default=False)
+    ifood_token = models.TextField(blank=True, null=True, help_text="Access Token do iFood")
+    ifood_token_expires = models.DateTimeField(blank=True, null=True)
 
     # Notification Customization
     notificar_preparo = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido entrar em preparo")
@@ -139,6 +163,18 @@ class Categoria(models.Model):
 
     def __str__(self):
         return f"{self.loja.nome} - {self.nome}"
+
+class BairroEntrega(models.Model):
+    loja = models.ForeignKey(ConfiguracaoLoja, on_delete=models.CASCADE, related_name='bairros_entrega')
+    nome = models.CharField(max_length=100)
+    taxa = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['nome']
+
+    def __str__(self):
+        return f"{self.nome} - R$ {self.taxa}"
 
 class GrupoDeAtributos(models.Model):
     TIPO_CHOICES = [
@@ -220,9 +256,12 @@ class Pedido(models.Model):
     forma_pagamento = models.CharField(max_length=20, choices=FORMA_PAGAMENTO_CHOICES, default='PIX')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NOVO')
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='ENTREGA')
+    taxa_entrega = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     mesa = models.PositiveIntegerField(null=True, blank=True)
     numero_diario = models.PositiveIntegerField(null=True, blank=True)
     observacoes = models.TextField(blank=True, null=True)
+    external_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID do pedido em plataformas externas (ex: iFood)")
+    origem = models.CharField(max_length=50, default='APP', help_text="APP, IFOOD, WHATSAPP, etc")
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):

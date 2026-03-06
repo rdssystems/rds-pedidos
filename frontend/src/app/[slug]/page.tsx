@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { ProductModal } from '@/components/Menu/ProductModal';
-import { ShoppingBag, ChevronRight, X, Clock, MapPin } from 'lucide-react';
+import { ShoppingBag, ChevronRight, X, Clock, MapPin, Phone } from 'lucide-react';
 
 interface StoreData {
     id: number;
@@ -17,6 +17,9 @@ interface StoreData {
     horario_funcionamento: any;
     categorias: any[];
     banner?: string;
+    tipo_taxa_entrega?: 'FIXA' | 'BAIRRO';
+    taxa_entrega_fixa?: string;
+    bairros_entrega?: { id: number, nome: string, taxa: string, ativo: boolean }[];
 }
 
 const DIAS_MAP: Record<number, string> = {
@@ -24,6 +27,7 @@ const DIAS_MAP: Record<number, string> = {
 };
 
 type PaymentMethod = 'DINHEIRO' | 'DEBITO' | 'CREDITO' | 'PIX';
+type DeliveryMethod = 'ENTREGA' | 'RETIRADA';
 
 export default function PublicMenuPage() {
     const { slug } = useParams();
@@ -45,9 +49,24 @@ export default function PublicMenuPage() {
         endereco_numero: '',
         endereco_bairro: '',
         pagamento: 'PIX' as PaymentMethod,
+        metodo_entrega: 'ENTREGA' as DeliveryMethod,
         troco: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const deliveryFee = React.useMemo(() => {
+        if (!store || checkoutData.metodo_entrega !== 'ENTREGA') return 0;
+
+        if (store.tipo_taxa_entrega === 'BAIRRO') {
+            if (!store.bairros_entrega) return 0;
+            const bairroSelecionado = store.bairros_entrega.find(b => b.nome === checkoutData.endereco_bairro);
+            return bairroSelecionado ? parseFloat(bairroSelecionado.taxa) : 0;
+        }
+
+        return parseFloat(store.taxa_entrega_fixa || '0');
+    }, [store, checkoutData.metodo_entrega, checkoutData.endereco_bairro]);
+
+    const grandTotal = total + deliveryFee;
 
     const checkStoreStatus = (data: StoreData) => {
         if (!data?.horario_funcionamento) return;
@@ -111,8 +130,13 @@ export default function PublicMenuPage() {
             const currentSlug = Array.isArray(slug) ? slug[0] : slug;
 
             try {
-                // Ensure we call the correct relative API path
-                const response = await fetch(`/api/lojas/${currentSlug}/`);
+                // Ensure we call the correct relative API path without caching
+                const response = await fetch(`/api/lojas/${currentSlug}/?_t=${new Date().getTime()}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
 
                 if (!response.ok) {
                     console.error(`Error ${response.status}: Failed to fetch store ${currentSlug}`);
@@ -177,8 +201,13 @@ export default function PublicMenuPage() {
             return;
         }
 
-        if (!checkoutData.nome || !checkoutData.telefone || !checkoutData.endereco_rua || !checkoutData.endereco_numero || !checkoutData.endereco_bairro) {
-            alert('Por favor, preencha todos os campos obrigatórios (Nome, Whatsapp e Endereço completo).');
+        if (!checkoutData.nome || !checkoutData.telefone) {
+            alert('Por favor, preencha seu Nome e Whatsapp.');
+            return;
+        }
+
+        if (checkoutData.metodo_entrega === 'ENTREGA' && (!checkoutData.endereco_rua || !checkoutData.endereco_numero || !checkoutData.endereco_bairro)) {
+            alert('Para receber em casa, por favor, preencha o Endereço completo.');
             return;
         }
 
@@ -189,13 +218,15 @@ export default function PublicMenuPage() {
                 alert('Valor de troco inválido.');
                 return;
             }
-            if (trocoValor < total) {
-                alert(`O valor para troco (R$ ${trocoValor.toFixed(2)}) não pode ser menor que o total do pedido (R$ ${total.toFixed(2)}).`);
+            if (trocoValor < grandTotal) {
+                alert(`O valor para troco (R$ ${trocoValor.toFixed(2)}) não pode ser menor que o total do pedido (R$ ${grandTotal.toFixed(2)}).`);
                 return;
             }
         }
 
-        const fullAddress = `${checkoutData.endereco_rua}, ${checkoutData.endereco_numero} - ${checkoutData.endereco_bairro}`;
+        const fullAddress = checkoutData.metodo_entrega === 'ENTREGA'
+            ? `${checkoutData.endereco_rua}, ${checkoutData.endereco_numero} - ${checkoutData.endereco_bairro}`
+            : 'Retirada na Loja';
 
         setIsSubmitting(true);
 
@@ -205,8 +236,9 @@ export default function PublicMenuPage() {
                 loja: store.id,
                 cliente_nome: checkoutData.nome,
                 cliente_whatsapp: checkoutData.telefone,
-                endereco: fullAddress,
-                total: total,
+                endereco: fullAddress, // This will be either the full address or "Retirada na Loja"
+                total: grandTotal,
+                taxa_entrega: deliveryFee,
                 forma_pagamento: checkoutData.pagamento,
                 itens: cart.map(item => ({
                     produto: item.productId,
@@ -254,7 +286,16 @@ export default function PublicMenuPage() {
                 message += `\n`;
             });
 
-            message += `📍 *ENTREGA:*\n${fullAddress}\n\n`;
+            if (checkoutData.metodo_entrega === 'ENTREGA') {
+                message += `📍 *ENTREGA:*\n${fullAddress}\n`;
+                if (deliveryFee > 0) {
+                    message += `🛵 *Taxa de Entrega:* ${formatCurrency(deliveryFee)}\n\n`;
+                } else {
+                    message += `🛵 *Taxa de Entrega:* Grátis\n\n`;
+                }
+            } else {
+                message += `🛍️ *RETIRADA:*\nO cliente vai retirar o pedido na loja.\n\n`;
+            }
 
             message += `💳 *PAGAMENTO:*\n`;
             message += `Forma: ${checkoutData.pagamento}\n`;
@@ -262,7 +303,11 @@ export default function PublicMenuPage() {
                 message += `Troco para: R$ ${checkoutData.troco}\n`;
             }
 
-            message += `\n💰 *TOTAL A PAGAR: ${formatCurrency(total)}*\n`;
+            message += `\n💰 *SUBTOTAL:* ${formatCurrency(total)}\n`;
+            if (checkoutData.metodo_entrega === 'ENTREGA' && deliveryFee > 0) {
+                message += `💰 *TAXA ENTREGA:* ${formatCurrency(deliveryFee)}\n`;
+            }
+            message += `💰 *TOTAL A PAGAR: ${formatCurrency(grandTotal)}*\n`;
             message += `\n_Pedido enviado via Cardápio Digital_`;
 
             // Open WhatsApp
@@ -281,6 +326,7 @@ export default function PublicMenuPage() {
                 endereco_numero: '',
                 endereco_bairro: '',
                 pagamento: 'PIX',
+                metodo_entrega: 'ENTREGA',
                 troco: ''
             });
             alert('Pedido enviado com sucesso!');
@@ -371,21 +417,37 @@ export default function PublicMenuPage() {
                                     })()}
                                 </div>
 
-                                {/* Address (Hidden on small screens if too long, maybe?) */}
+                                {/* Phone (Hidden on small screens) */}
+                                {store.whatsapp && (
+                                    <div className="hidden md:flex items-center gap-2 text-xs uppercase tracking-wider border-l border-gray-300 pl-4">
+                                        <Phone size={14} className="text-gray-500" />
+                                        <span>{store.whatsapp}</span>
+                                    </div>
+                                )}
+
+                                {/* Address (Hidden on small screens) */}
                                 {store.endereco && (
                                     <div className="hidden md:flex items-center gap-2 text-xs uppercase tracking-wider border-l border-gray-300 pl-4">
-                                        <MapPin size={14} className="text-gray-500" />
-                                        <span className="truncate max-w-[200px]">{store.endereco}</span>
+                                        <MapPin size={14} className="text-gray-500 flex-shrink-0" />
+                                        <span className="truncate max-w-[350px]" title={store.endereco}>{store.endereco}</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Mobile Address (Separate line) */}
-                            {store.endereco && (
-                                <p className="md:hidden text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 mt-2">
-                                    <MapPin size={12} /> {store.endereco}
-                                </p>
-                            )}
+                            {/* Mobile Info (Separate line) */}
+                            <div className="md:hidden flex flex-col items-center gap-2 mt-3 w-full max-w-sm">
+                                {store.whatsapp && (
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 bg-white/50 backdrop-blur-sm py-1.5 px-3 rounded-full shadow-sm">
+                                        <Phone size={12} className="text-gray-500" /> {store.whatsapp}
+                                    </p>
+                                )}
+                                {store.endereco && (
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 text-center bg-white/50 backdrop-blur-sm py-2 px-4 rounded-xl shadow-sm w-full mx-4">
+                                        <MapPin size={12} className="flex-shrink-0 text-gray-500" />
+                                        <span className="line-clamp-2">{store.endereco}</span>
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -545,41 +607,76 @@ export default function PublicMenuPage() {
                                                 <p className="text-[10px] text-gray-400 font-bold ml-2">Apenas números (DDD + Número)</p>
                                             </div>
 
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
+                                            {checkoutData.metodo_entrega === 'ENTREGA' && (
+                                                <div className="space-y-4 animate-slide-up">
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
 
-                                                    {/* Rua */}
-                                                    <input
-                                                        type="text"
-                                                        value={checkoutData.endereco_rua}
-                                                        onChange={(e) => setCheckoutData({ ...checkoutData, endereco_rua: e.target.value })}
-                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                        placeholder="Rua / Avenida"
-                                                    />
+                                                        {/* Rua */}
+                                                        <input
+                                                            type="text"
+                                                            value={checkoutData.endereco_rua}
+                                                            onChange={(e) => setCheckoutData({ ...checkoutData, endereco_rua: e.target.value })}
+                                                            className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                            placeholder="Rua / Avenida"
+                                                        />
 
-                                                    <div className="flex gap-4">
-                                                        {/* Number */}
-                                                        <div className="flex-1">
-                                                            <input
-                                                                type="text"
-                                                                value={checkoutData.endereco_numero}
-                                                                onChange={(e) => setCheckoutData({ ...checkoutData, endereco_numero: e.target.value })}
-                                                                className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                                placeholder="Número"
-                                                            />
-                                                        </div>
-                                                        {/* Neighborhood */}
-                                                        <div className="flex-[2]">
-                                                            <input
-                                                                type="text"
-                                                                value={checkoutData.endereco_bairro}
-                                                                onChange={(e) => setCheckoutData({ ...checkoutData, endereco_bairro: e.target.value })}
-                                                                className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                                placeholder="Bairro"
-                                                            />
+                                                        <div className="flex gap-4">
+                                                            {/* Number */}
+                                                            <div className="flex-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={checkoutData.endereco_numero}
+                                                                    onChange={(e) => setCheckoutData({ ...checkoutData, endereco_numero: e.target.value })}
+                                                                    className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                                    placeholder="Número"
+                                                                />
+                                                            </div>
+                                                            {/* Neighborhood */}
+                                                            <div className="flex-[2]">
+                                                                {store.tipo_taxa_entrega === 'BAIRRO' ? (
+                                                                    <select
+                                                                        value={checkoutData.endereco_bairro}
+                                                                        onChange={(e) => setCheckoutData({ ...checkoutData, endereco_bairro: e.target.value })}
+                                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300 appearance-none bg-no-repeat bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22%239CA3AF%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[position:right_1rem_center] bg-[size:1.25em_1.25em]"
+                                                                    >
+                                                                        <option value="" disabled>Selecione seu Bairro</option>
+                                                                        {store.bairros_entrega?.map(b => (
+                                                                            <option key={b.id} value={b.nome}>{b.nome} - R$ {parseFloat(b.taxa).toFixed(2)}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={checkoutData.endereco_bairro}
+                                                                        onChange={(e) => setCheckoutData({ ...checkoutData, endereco_bairro: e.target.value })}
+                                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                                        placeholder="Bairro"
+                                                                    />
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            <div className="h-px bg-gray-100 w-full my-4"></div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Como vai querer receber?</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {['ENTREGA', 'RETIRADA'].map((method) => (
+                                                        <button
+                                                            key={method}
+                                                            onClick={() => setCheckoutData({ ...checkoutData, metodo_entrega: method as DeliveryMethod })}
+                                                            className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.metodo_entrega === method
+                                                                ? 'bg-blue-900 text-white border-blue-900 shadow-md'
+                                                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                                                                }`}
+                                                        >
+                                                            {method === 'ENTREGA' ? 'Receber em Casa' : 'Retirar na Loja'}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
 
@@ -624,12 +721,12 @@ export default function PublicMenuPage() {
                                                 </div>
                                                 <div className="flex justify-between text-gray-500 text-sm font-bold">
                                                     <span>Taxa de Entrega</span>
-                                                    <span>A combinar</span>
+                                                    <span>{checkoutData.metodo_entrega === 'ENTREGA' ? (deliveryFee > 0 ? formatCurrency(deliveryFee) : (store.tipo_taxa_entrega === 'BAIRRO' && !checkoutData.endereco_bairro ? 'A calcular' : 'Grátis')) : 'Grátis'}</span>
                                                 </div>
                                                 <div className="h-[1px] bg-blue-100 my-2"></div>
                                                 <div className="flex justify-between text-2xl font-black text-blue-900">
                                                     <span>Total</span>
-                                                    <span>{formatCurrency(total)}</span>
+                                                    <span>{formatCurrency(grandTotal)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -642,7 +739,7 @@ export default function PublicMenuPage() {
                                         <>
                                             <div className="flex justify-between items-end">
                                                 <span className="font-black text-xs text-gray-400 uppercase tracking-widest">Valor do Pedido</span>
-                                                <span className="font-black text-4xl italic tracking-tighter" style={{ color: store.cor_primaria }}>{formatCurrency(total)}</span>
+                                                <span className="font-black text-4xl italic tracking-tighter" style={{ color: store.cor_primaria }}>{formatCurrency(view === 'cart' ? total : grandTotal)}</span>
                                             </div>
                                             <button
                                                 onClick={() => setView('checkout')}

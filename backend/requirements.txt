@@ -11,3 +11,4 @@ daphne
 channels
 channels_redis
 requests
+mercadopago

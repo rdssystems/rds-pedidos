@@ -41,9 +41,14 @@ def notify_order_change(sender, instance, created, **kwargs):
         'numero_diario': instance.numero_diario,
         'status': instance.status,
         'cliente_nome': instance.cliente_nome,
+        'cliente_whatsapp': instance.cliente_whatsapp,
         'total': str(instance.total),
         'tipo': instance.tipo,
-        'created': created
+        'endereco': instance.endereco,
+        'forma_pagamento': instance.forma_pagamento,
+        'observacoes': instance.observacoes,
+        'criado_em': instance.criado_em.isoformat() if instance.criado_em else None,
+        'is_new': created
     }
     
     # Send to specific store group

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Phone, MapPin, CreditCard, Clock, CheckCircle, ChevronRight, AlertCircle, ShoppingBag, Printer } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface ProdutoObj {
     nome: string;
@@ -29,6 +30,8 @@ interface Pedido {
     criado_em: string;
     mesa?: number;
     observacoes?: string;
+    origem?: string;
+    external_id?: string;
     itens: Item[];
 }
 
@@ -39,6 +42,9 @@ interface PedidoDetailsModalProps {
 }
 
 export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDetailsModalProps) => {
+    const { user } = useAuth();
+    const userRoles = user?.roles?.map(r => r.role) || [];
+
     if (!pedido) return null;
 
     const STATUS_LABELS: Record<string, string> = {
@@ -194,6 +200,11 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                             <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-sm ${STATUS_COLORS[pedido.status] || 'bg-gray-100 text-gray-500'}`}>
                                 {STATUS_LABELS[pedido.status] || pedido.status}
                             </span>
+                            {pedido.origem === 'IFOOD' && (
+                                <span className="text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest bg-red-600 text-white shadow-sm flex items-center gap-1">
+                                    <ShoppingBag size={12} /> iFood
+                                </span>
+                            )}
                         </div>
                         <p className="text-xs font-bold text-gray-400 pl-1">
                             Recebido há {timeString}
@@ -307,7 +318,6 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                                                 ))}
                                             </div>
                                         )}
-
                                         {item.observacoes && (
                                             <div className="flex items-start gap-2 mt-2 text-amber-600 bg-amber-50 p-2 rounded-lg text-xs font-bold border border-amber-100">
                                                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -340,7 +350,8 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                                     onStatusChange('CANCELADO');
                                 }
                             }}
-                            className="px-6 py-4 rounded-2xl font-black text-red-500 text-xs hover:bg-red-50 transition-colors uppercase tracking-widest"
+                            disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
+                            className="px-6 py-4 rounded-2xl font-black text-red-500 text-xs hover:bg-red-50 transition-colors uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             Cancelar Pedido
                         </button>
@@ -348,7 +359,8 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                         {pedido.status !== 'FINALIZADO' && pedido.status !== 'CANCELADO' && (
                             <button
                                 onClick={handleNextStatus}
-                                className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group"
+                                disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
+                                className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-30 disabled:cursor-not-allowed"
                             >
                                 <span>Avançar para {STATUS_LABELS[['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'][['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'].indexOf(pedido.status) + 1]]}</span>
                                 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />

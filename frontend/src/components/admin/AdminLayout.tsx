@@ -21,7 +21,7 @@ import {
 
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useBilling } from '@/context/BillingContext';
 
@@ -29,11 +29,18 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     const { logout, user } = useAuth();
     const { store } = useBilling();
     const pathname = usePathname();
+    const router = useRouter();
     const [isMinimized, setIsMinimized] = React.useState(false);
     const [closingAlert, setClosingAlert] = React.useState<string | null>(null);
 
     // Get all unique roles user has across all stores (simplified for now)
-    const userRoles = user?.roles?.map(r => r.role) || [];
+    const [userRoles, setUserRoles] = React.useState<string[]>([]);
+
+    React.useEffect(() => {
+        if (user?.roles) {
+            setUserRoles(user.roles.map(r => r.role));
+        }
+    }, [user]);
 
     React.useEffect(() => {
         if (!store?.horario_funcionamento) return;
@@ -94,6 +101,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         { label: 'Cardápio', icon: UtensilsCrossed, href: '/menu', roles: ['owner', 'manager'] },
         { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'], plan: ['PRO'] },
         { label: 'WhatsApp', icon: MessageSquare, href: '/settings/whatsapp', roles: ['owner', 'manager'], plan: ['PRO'] },
+        { label: 'iFood', icon: ShoppingBag, href: '/settings/ifood', roles: ['owner', 'manager'], plan: ['PRO'] },
         { label: 'Assinatura', icon: CreditCard, href: '/settings/billing', roles: ['owner'] },
         { label: 'Configurações', icon: Settings, href: '/settings', roles: ['owner', 'manager'] },
     ];
@@ -131,6 +139,29 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
         return true;
     });
+
+    // Handle unauthorized access (Redirect from dashboard if waiter)
+    React.useEffect(() => {
+        if (!userRoles.length || pathname === '/login') return;
+
+        const currentItem = menuItems.find(item => item.href === pathname);
+        if (currentItem) {
+            const hasAccess = currentItem.roles.some(role => userRoles.includes(role));
+            if (!hasAccess) {
+                // If on dashboard and is waiter, redirect to /orders or /mesas
+                if (pathname === '/dashboard' && userRoles.includes('waiter')) {
+                    router.push('/orders');
+                } else if (pathname !== '/orders' && userRoles.includes('waiter') && !['/mesas', '/orders'].includes(pathname)) {
+                    // Waiters should only be on /mesas or /orders
+                    router.push('/orders');
+                }
+            }
+        } else if (pathname === '/') {
+            // Default redirect from root
+            if (userRoles.includes('waiter')) router.push('/orders');
+            else router.push('/dashboard');
+        }
+    }, [pathname, userRoles]);
 
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row">
@@ -205,18 +236,68 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 </nav>
 
                 <div className="p-4 mt-auto">
-                    <div className={`bg-gray-50 rounded-3xl ${isMinimized ? 'p-2' : 'p-4'} mb-4 border border-gray-100 flex justify-center`}>
-                        <div className="flex items-center gap-3">
+                    <div className={`bg-gray-50 rounded-3xl ${isMinimized ? 'p-2' : 'p-4'} mb-4 border border-gray-100 flex flex-col items-center gap-3`}>
+                        <div className="flex w-full items-center gap-3 justify-center">
                             <div className="w-10 h-10 bg-gradient-to-tr from-gray-200 to-gray-300 rounded-full flex items-center justify-center text-xs font-black text-gray-400 uppercase shrink-0">
                                 {user?.first_name?.[0] || user?.email?.[0] || 'A'}
                             </div>
                             {!isMinimized && (
-                                <div className="flex flex-col overflow-hidden">
+                                <div className="flex flex-col overflow-hidden flex-1">
                                     <span className="text-sm font-black text-gray-900 truncate">{user?.first_name || user?.email?.split('@')[0] || 'Usuário'}</span>
                                     <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">{getRoleLabel()}</span>
                                 </div>
                             )}
                         </div>
+
+                        {!isMinimized && store && (
+                            <div className="w-full flex-col gap-1 border-t border-gray-200 pt-3 flex animate-fade-in-up">
+                                {(() => {
+                                    const currentPlan = store.plano_details?.nome || 'Sem Plano';
+                                    const statusLabel = {
+                                        trial: 'Trial 7 dias',
+                                        active: 'Ativo',
+                                        expired: 'Expirado',
+                                        canceled: 'Cancelado'
+                                    }[store.status_assinatura] || store.status_assinatura;
+
+                                    let daysLeft = 0;
+                                    if (store.valido_ate) {
+                                        const end = new Date(store.valido_ate);
+                                        const now = new Date();
+                                        const diff = end.getTime() - now.getTime();
+                                        daysLeft = Math.ceil(diff / (1000 * 3600 * 24));
+                                    }
+
+                                    return (
+                                        <div className="flex flex-col gap-1 w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Plano</span>
+                                                <span className="text-[10px] font-black text-primary">{currentPlan}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</span>
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${store.status_assinatura === 'trial' ? 'bg-orange-100 text-orange-600' :
+                                                        store.status_assinatura === 'active' ? 'bg-green-100 text-green-600' :
+                                                            'bg-red-100 text-red-600'
+                                                    }`}>
+                                                    {statusLabel}
+                                                </span>
+                                            </div>
+                                            {(store.status_assinatura === 'trial' || store.status_assinatura === 'active') && daysLeft > 0 && (
+                                                <div className="text-[10px] font-semibold text-gray-400 mt-1 text-center bg-gray-50 py-1 rounded-lg">
+                                                    {daysLeft} dia{daysLeft > 1 ? 's' : ''} restante{daysLeft > 1 ? 's' : ''}
+                                                </div>
+                                            )}
+                                            {store.status_assinatura === 'expired' && (
+                                                <div className="text-[10px] font-bold text-red-500 mt-1 text-center bg-red-50 py-1 rounded-lg">
+                                                    Renovação pendente
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={logout}

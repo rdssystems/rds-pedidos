@@ -1,3 +1,4 @@
+import logging
 from django.conf import settings
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
@@ -15,7 +16,7 @@ from .serializers import (
     StoreDetailSerializer, CategoriaSerializer, ProdutoSerializer,
     PedidoSerializer, FlexibleJSONField, GrupoDeAtributosSerializer,
     AtributoOpcaoSerializer, ItemPedidoSerializer, PerfilUsuarioLojaSerializer,
-    CaixaSerializer, MovimentacaoCaixaSerializer, UserSerializer
+    CaixaSerializer, MovimentacaoCaixaSerializer, UserSerializer, BairroEntregaSerializer
 )
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -24,8 +25,12 @@ from django.core.mail import send_mail
 from django.http import JsonResponse
 from rest_framework.exceptions import PermissionDenied
 from .services import EvolutionService
+from .ifood_service import IFoodService
+from .mercadopago_service import MercadoPagoService
 import json
 import uuid
+
+logger = logging.getLogger(__name__)
 
 class HasActiveSubscription(permissions.BasePermission):
     message = "Esta loja não possui uma assinatura ativa."
@@ -247,6 +252,143 @@ class StoreViewSet(viewsets.ModelViewSet):
             return Response({"message": "Disconnected"})
         except Exception as e: return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['post'], url_path='ifood-sync')
+    def ifood_sync(self, request, slug=None):
+        store = self.get_object()
+        if not store.ifood_active or not settings.IFOOD_CLIENT_ID:
+            return Response({"error": "Integração iFood não está ativa ou configurada."}, status=400)
+        
+        service = IFoodService(store)
+        events = service.get_events()
+        
+        processed_count = 0
+        event_ids = []
+        
+        for event in events:
+            event_ids.append(event['id'])
+            if event['eventType'] == 'CREATED':
+                order_id = event['orderId']
+                # Check if we already have this order
+                if not Pedido.objects.filter(external_id=order_id).exists():
+                    details = service.get_order_details(order_id)
+                    if details:
+                        # Convert iFood order to our Pedido
+                        with transaction.atomic():
+                            # Simple mapping for now
+                            pedido = Pedido.objects.create(
+                                loja=store,
+                                cliente_nome=details.get('customer', {}).get('name', 'Cliente iFood'),
+                                total=Decimal(str(details.get('total', {}).get('orderAmount', 0))),
+                                status='NOVO',
+                                tipo='ENTREGA' if details.get('orderType') == 'DELIVERY' else 'RETIRADA',
+                                external_id=order_id,
+                                origem='IFOOD',
+                                observacoes=details.get('notes', '')
+                            )
+                            # Add items
+                            for item in details.get('items', []):
+                                prod = Produto.objects.filter(categoria__loja=store, nome__iexact=item.get('name')).first()
+                                if prod:
+                                    ItemPedido.objects.create(
+                                        pedido=pedido,
+                                        produto=prod,
+                                        quantidade=item.get('quantity', 1),
+                                        preco_unitario=Decimal(str(item.get('unitPrice', 0))),
+                                        observacoes=item.get('observations', '')
+                                    )
+                        processed_count += 1
+        
+        if event_ids:
+            service.acknowledge_events(event_ids)
+
+        return Response({"message": f"Sincronização concluída. {processed_count} novos pedidos importados."})
+
+    @action(detail=True, methods=['post'], url_path='ifood-import-menu')
+    def ifood_import_menu(self, request, slug=None):
+        store = self.get_object()
+        if not store.ifood_active or not settings.IFOOD_CLIENT_ID:
+            return Response({"error": "Integração iFood não está ativa ou configurada."}, status=400)
+            
+        service = IFoodService(store)
+        result = service.import_catalog()
+        
+        if "error" in result:
+            return Response({"error": result["error"]}, status=400)
+            
+        return Response({
+            "message": f"Cardápio importado com sucesso! {result['categories']} categorias e {result['products']} produtos criados/atualizados."
+        })
+
+    @action(detail=True, methods=['post'], url_path='mp-create-subscription')
+    def mp_create_subscription(self, request, slug=None):
+        store = self.get_object()
+        plan_type = request.data.get('plan_type') # 'START', 'PRO', 'ELITE'
+        
+        if plan_type not in ['START', 'PRO', 'ELITE']:
+            return Response({"error": "Plano inválido."}, status=400)
+            
+        # Preços definidos na nossa conversa estratégica
+        prices = {
+            'START': 49.90,
+            'PRO': 129.90,
+            'ELITE': 199.90
+        }
+        
+        service = MercadoPagoService()
+        plan_title = f"{plan_type} - RDS Gestor de Pedidos"
+        amount = prices[plan_type]
+        
+        try:
+            print(f"DEBUG: Creating Plan for {plan_title}")
+            # No Mercado Pago, o fluxo mais simples para Assinatura via Checkout 
+            # é criar um Plano e enviar o cliente para o init_point dele.
+            plan_res = service.create_plan(plan_title, float(amount))
+            print(f"DEBUG: Plan Full Response: {json.dumps(plan_res)}")
+            
+            init_point = plan_res.get('init_point')
+            plan_id = plan_res.get('id')
+            
+            if not plan_id:
+                 return Response({
+                     "error": "Falha ao criar plano no Mercado Pago.", 
+                     "details": plan_res
+                }, status=400)
+
+            # Se por algum motivo o init_point não vier no JSON, montamos o link padrão
+            if not init_point:
+                init_point = f"https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id={plan_id}"
+
+            # Salva o ID do plano que o usuário escolheu
+            store.mp_plan_id = plan_id
+            store.plano_tipo = plan_type
+            store.save()
+            
+            return Response({
+                "init_point": init_point,
+                "message": "Iniciando processo de assinatura..."
+            })
+            
+        except Exception as e:
+            print(f"ERROR: Exception in mp_create_subscription: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({"error": f"Erro interno: {str(e)}"}, status=500)
+
+    @action(detail=True, methods=['post'], url_path='ifood-verify')
+    def ifood_verify(self, request, slug=None):
+        store = self.get_object()
+        if not store.ifood_merchant_id:
+            return Response({"error": "ID da loja (Merchant ID) não informado."}, status=400)
+            
+        service = IFoodService(store)
+        catalogs = service.get_catalogs()
+        
+        # If catalogs returns a list, the ID is valid for the authorized developer app
+        if catalogs and not isinstance(catalogs, dict):
+            return Response({"message": "Conexão com iFood estabelecida com sucesso!"})
+        else:
+            return Response({"error": "Não foi possível validar o Merchant ID. Verifique se o código está correto."}, status=400)
+
     @action(detail=True, methods=['post'], url_path='migrar-plano')
     def migrar_plano(self, request, slug=None):
         print(f"DEBUG: migrar_plano called for slug: {slug}", flush=True)
@@ -266,15 +408,25 @@ class StoreViewSet(viewsets.ModelViewSet):
             return Response({"error": "Plano não encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
     def update(self, request, *args, **kwargs):
+        with open('debug_frontend_payload.txt', 'w') as f:
+            f.write(str(dict(request.data)))
+            
         if 'horario_funcionamento' in request.data and isinstance(request.data['horario_funcionamento'], str):
             try:
                 data = request.data.copy()
                 data['horario_funcionamento'] = json.loads(data['horario_funcionamento'])
                 serializer = self.get_serializer(self.get_object(), data=data, partial=kwargs.get('partial', False))
                 serializer.is_valid(raise_exception=True)
+                with open('debug_frontend_payload.txt', 'a') as f:
+                    f.write("\nValid custom: " + str(serializer.validated_data))
                 self.perform_update(serializer)
                 return Response(serializer.data)
             except json.JSONDecodeError: pass
+        
+        serializer = self.get_serializer(self.get_object(), data=request.data, partial=kwargs.get('partial', False))
+        serializer.is_valid(raise_exception=True)
+        with open('debug_frontend_payload.txt', 'a') as f:
+            f.write("\nValid super: " + str(serializer.validated_data))
         return super().update(request, *args, **kwargs)
 
 class DashboardStatsView(APIView):
@@ -383,6 +535,20 @@ class AtributoOpcaoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return AtributoOpcao.objects.filter(Q(grupo__loja__owner=self.request.user) | Q(grupo__loja__equipe__user=self.request.user)).distinct()
 
+class BairroEntregaViewSet(viewsets.ModelViewSet):
+    serializer_class = BairroEntregaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return BairroEntrega.objects.filter(Q(loja__owner=self.request.user) | Q(loja__equipe__user=self.request.user)).distinct()
+        
+    def perform_create(self, serializer):
+        loja = ConfiguracaoLoja.objects.filter(Q(owner=self.request.user) | Q(equipe__user=self.request.user)).first()
+        if not loja:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Você não possui uma loja vinculada para criar bairros de entrega.")
+        serializer.save(loja=loja)
+
 class PedidoViewSet(viewsets.ModelViewSet):
     serializer_class = PedidoSerializer
     
@@ -430,6 +596,16 @@ class PedidoViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(mesa=mesa)
             
         return queryset
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        # Trigger iFood status update if applicable
+        if instance.origem == 'IFOOD' and instance.external_id:
+            try:
+                service = IFoodService(instance.loja)
+                service.update_order_status(instance.external_id, instance.status)
+            except Exception as e:
+                print(f"Erro ao atualizar status no iFood: {e}")
 
     @action(detail=False, methods=['get'])
     def mesas(self, request):
@@ -700,3 +876,8 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
             return Response({"error": "Loja não encontrada"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class MercadoPagoWebhookView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def post(self, request):
+        return Response(status=200)

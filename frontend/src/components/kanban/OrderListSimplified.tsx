@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { useBilling } from '@/context/BillingContext';
+import { useAuth } from '@/context/AuthContext';
 import { PedidoDetailsModal } from './PedidoDetailsModal';
 
 interface Pedido {
@@ -50,9 +51,18 @@ export const OrderListSimplified = () => {
     const [pedidos, setPedidos] = useState<Pedido[]>([]);
     const { lastMessage } = useSocket();
     const { store } = useBilling();
+    const { user } = useAuth();
+    const userRoles = user?.roles?.map(r => r.role) || [];
     const [loading, setLoading] = useState(true);
     const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const getLocalDateString = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString(new Date()));
 
     const getShiftStartHour = (config: any, date: Date) => {
         if (!config?.horario_funcionamento) return 6; // Default 6am
@@ -88,7 +98,9 @@ export const OrderListSimplified = () => {
             if (currentHour < shiftStartHour) {
                 const yesterday = new Date(now);
                 yesterday.setDate(yesterday.getDate() - 1);
-                setSelectedDate(yesterday.toISOString().split('T')[0]);
+                setSelectedDate(getLocalDateString(yesterday));
+            } else {
+                setSelectedDate(getLocalDateString(now));
             }
         }
     }, [store]);
@@ -130,7 +142,7 @@ export const OrderListSimplified = () => {
 
     useEffect(() => {
         if (lastMessage) {
-            if (lastMessage.created) {
+            if (lastMessage.is_new || lastMessage.created === true) {
                 setPedidos(prev => {
                     const alreadyExists = prev.some(p => p.id === lastMessage.id);
                     if (alreadyExists) return prev;
@@ -266,7 +278,8 @@ export const OrderListSimplified = () => {
                                     {pedido.status !== 'FINALIZADO' && pedido.status !== 'CANCELADO' && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleFinalizar(pedido.id); }}
-                                            className="bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
+                                            disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
+                                            className="bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                                         >
                                             <CheckCircle2 size={16} /> Finalizar
                                         </button>

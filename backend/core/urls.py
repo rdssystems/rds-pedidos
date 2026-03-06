@@ -5,7 +5,8 @@ from .views import (
     StoreViewSet, PedidoViewSet, CategoriaViewSet, 
     ProdutoViewSet, GrupoDeAtributosViewSet, AtributoOpcaoViewSet,
     TeamMemberViewSet, RegisterView, api_status, UserViewSet,
-    DashboardStatsView, CaixaViewSet
+    DashboardStatsView, CaixaViewSet, BairroEntregaViewSet,
+    MercadoPagoWebhookView
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r'pedidos', PedidoViewSet, basename='pedido')
 router.register(r'equipe', TeamMemberViewSet, basename='equipe')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'caixa', CaixaViewSet, basename='caixa')
+router.register(r'bairros', BairroEntregaViewSet, basename='bairro')
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -32,4 +34,5 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view({'post': 'create'}), name='register'),
+    path('api/mp-webhook/', MercadoPagoWebhookView.as_view(), name='mp-webhook'),
 ]

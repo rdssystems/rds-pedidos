@@ -14,7 +14,15 @@ interface Pedido {
 
 import { ArrowRight, CheckCheck } from 'lucide-react';
 
-export const PedidoCard = ({ pedido, onVerPedido, onAvançar }: { pedido: Pedido, onVerPedido: (id: number) => void, onAvançar: () => any }) => {
+interface PedidoCardProps {
+    pedido: Pedido;
+    onVerPedido: (id: number) => void;
+    onAvançar: () => any;
+    draggable?: boolean;
+    onDragStart?: (e: React.DragEvent<HTMLDivElement>, id: number) => void;
+}
+
+export const PedidoCard: React.FC<PedidoCardProps> = ({ pedido, onVerPedido, onAvançar, draggable, onDragStart }) => {
     const [isDelayed, setIsDelayed] = useState(false);
     const [minutesElapsed, setMinutesElapsed] = useState(0);
 
@@ -22,8 +30,13 @@ export const PedidoCard = ({ pedido, onVerPedido, onAvançar }: { pedido: Pedido
         const checkDelay = () => {
             const now = new Date();
             const created = new Date(pedido.criado_em);
+            if (isNaN(created.getTime())) {
+                setMinutesElapsed(0);
+                return;
+            }
+
             const diffMs = now.getTime() - created.getTime();
-            const diffMins = Math.floor(diffMs / 60000);
+            const diffMins = Math.max(0, Math.floor(diffMs / 60000));
 
             setMinutesElapsed(diffMins);
             if (pedido.status === 'NOVO' && diffMins >= 5) {
@@ -52,7 +65,11 @@ export const PedidoCard = ({ pedido, onVerPedido, onAvançar }: { pedido: Pedido
     const nextLabel = getNextStatusLabel();
 
     return (
-        <div className={`p-4 mb-4 rounded-[2rem] shadow-sm border transaction-all duration-300 bg-white hover:shadow-md ${isDelayed ? 'border-red-200 ring-2 ring-red-50 bg-red-50/10' : 'border-white'}`}>
+        <div
+            draggable={draggable}
+            onDragStart={(e) => onDragStart && onDragStart(e, pedido.id)}
+            className={`p-4 mb-4 rounded-[2rem] shadow-sm border transaction-all duration-300 bg-white hover:shadow-md ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${isDelayed ? 'border-red-200 ring-2 ring-red-50 bg-red-50/10' : 'border-white'}`}
+        >
             <div className="flex justify-between items-start mb-3">
                 <span className="font-black text-xs px-3 py-1 bg-gray-100 rounded-full text-gray-500">#{pedido.numero_diario || pedido.id}</span>
                 <span className={`text-[10px] uppercase font-black tracking-wider px-2 py-1 rounded-full ${isDelayed ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-green-50 text-green-600'}`}>

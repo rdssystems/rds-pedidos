@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile
+from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile, BairroEntrega
 
 import json
 
@@ -144,8 +144,15 @@ class CategoriaSerializer(serializers.ModelSerializer):
         model = Categoria
         fields = ['id', 'loja', 'nome', 'ordem', 'ativa', 'produtos', 'loja_details']
 
+class BairroEntregaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BairroEntrega
+        fields = ['id', 'loja', 'nome', 'taxa', 'ativo']
+        read_only_fields = ['loja']
+
 class StoreDetailSerializer(serializers.ModelSerializer):
     categorias = CategoriaSerializer(many=True, read_only=True)
+    bairros_entrega = BairroEntregaSerializer(many=True, read_only=True)
     plano_details = PlanoSerializer(source='plano', read_only=True)
     horario_funcionamento = FlexibleJSONField(required=False)
 
@@ -155,10 +162,12 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'id', 'owner', 'nome', 'slug', 'cor_primaria', 'cor_secundaria', 
             'logo', 'banner', 'whatsapp', 'endereco', 'horario_funcionamento', 'ativa',
             'evolution_instance', 'evolution_token',
+            'ifood_client_id', 'ifood_client_secret', 'ifood_merchant_id', 'ifood_active',
             'notificar_preparo', 'notificar_entrega', 'notificar_finalizado',
             'msg_preparo', 'msg_entrega', 'msg_finalizado',
             'plano', 'plano_details', 'status_assinatura', 'valido_ate',
-            'categorias'
+            'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
+            'categorias', 'bairros_entrega'
         ]
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
@@ -174,7 +183,12 @@ class PedidoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Pedido
-        fields = '__all__'
+        fields = [
+            'id', 'loja', 'cliente_nome', 'cliente_whatsapp', 'endereco', 
+            'total', 'forma_pagamento', 'status', 'tipo', 'taxa_entrega', 
+            'mesa', 'numero_diario', 'observacoes', 'external_id', 'origem', 
+            'criado_em', 'itens'
+        ]
 
     def create(self, validated_data):
         try:

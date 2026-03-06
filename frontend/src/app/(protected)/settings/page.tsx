@@ -11,7 +11,10 @@ import {
     CheckCircle2,
     Eye,
     MapPin,
-    Clock
+    Clock,
+    Truck,
+    Plus,
+    Trash2
 } from 'lucide-react';
 
 const DIAS_SEMANA = [
@@ -41,6 +44,14 @@ export default function StoreSettings() {
     const [msgPreparo, setMsgPreparo] = useState('Olá {cliente}! 👨‍🍳 Seu pedido #{numero} começou a ser preparado em *{loja}*. Em breve avisaremos quando sair para entrega!');
     const [msgEntrega, setMsgEntrega] = useState('Olá {cliente}! 🛵 Seu pedido #{numero} de *{loja}* saiu para entrega! Fique atento(a).');
     const [msgFinalizado, setMsgFinalizado] = useState('Pedido #{numero} de *{loja}* concluído. Obrigado pela preferência, {cliente}! ⭐');
+
+    // Delivery Settings
+    const [tipoTaxaEntrega, setTipoTaxaEntrega] = useState<'FIXA' | 'BAIRRO'>('FIXA');
+    const [taxaEntregaFixa, setTaxaEntregaFixa] = useState<string>('0.00');
+    const [bairros, setBairros] = useState<any[]>([]);
+    const [novoBairroNome, setNovoBairroNome] = useState('');
+    const [novoBairroTaxa, setNovoBairroTaxa] = useState('');
+    const [isAddingBairro, setIsAddingBairro] = useState(false);
 
     type DaySchedule = {
         open: string;
@@ -95,8 +106,12 @@ export default function StoreSettings() {
         const fetchSettings = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch('/api/lojas/', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const response = await fetch(`/api/lojas/?_t=${new Date().getTime()}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache'
+                    }
                 });
                 const data = await response.json();
                 const s = Array.isArray(data) ? data[0] : (data.results ? data.results[0] : data);
@@ -119,6 +134,11 @@ export default function StoreSettings() {
                     setMsgFinalizado(s.msg_finalizado || 'Pedido #{numero} de *{loja}* concluído. Obrigado pela preferência, {cliente}! ⭐');
                     setLogoPreview(s.logo);
                     setBannerPreview(s.banner);
+
+                    // Delivery
+                    setTipoTaxaEntrega(s.tipo_taxa_entrega || 'FIXA');
+                    setTaxaEntregaFixa(s.taxa_entrega_fixa ? parseFloat(s.taxa_entrega_fixa).toFixed(2) : '0.00');
+                    setBairros(s.bairros_entrega || []);
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -166,6 +186,10 @@ export default function StoreSettings() {
             formData.append('msg_entrega', msgEntrega);
             formData.append('msg_finalizado', msgFinalizado);
 
+            // Delivery config
+            formData.append('tipo_taxa_entrega', tipoTaxaEntrega);
+            formData.append('taxa_entrega_fixa', taxaEntregaFixa.replace(',', '.'));
+
             if (logoFile) {
                 formData.append('logo', logoFile);
             }
@@ -194,6 +218,54 @@ export default function StoreSettings() {
             setError(err.message || 'Erro ao conectar ao servidor');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleAddBairro = async () => {
+        if (!novoBairroNome || !novoBairroTaxa) return;
+        setIsAddingBairro(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/bairros/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    nome: novoBairroNome,
+                    taxa: parseFloat(novoBairroTaxa.replace(',', '.'))
+                })
+            });
+            if (response.ok) {
+                const newBairro = await response.json();
+                setBairros([...bairros, newBairro]);
+                setNovoBairroNome('');
+                setNovoBairroTaxa('');
+            } else {
+                const data = await response.json();
+                setError(JSON.stringify(data));
+            }
+        } catch (err) {
+            console.error('Error adding bairro:', err);
+        } finally {
+            setIsAddingBairro(false);
+        }
+    };
+
+    const handleRemoveBairro = async (id: number) => {
+        if (!confirm('Deseja realmente remover este bairro?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/bairros/${id}/`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setBairros(bairros.filter(b => b.id !== id));
+            }
+        } catch (err) {
+            console.error('Error removing bairro:', err);
         }
     };
 
@@ -583,6 +655,121 @@ export default function StoreSettings() {
                                 );
                             })}
                         </div>
+                    </div>
+
+                    {/* Taxas de Entrega - NOVO */}
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 space-y-6">
+                        <div className="flex items-center gap-3 border-l-4 border-yellow-500 pl-4">
+                            <Truck className="text-yellow-500" />
+                            <h2 className="text-xl font-bold text-gray-900 uppercase italic">Frete e Entregas</h2>
+                        </div>
+
+                        <p className="text-gray-500 text-sm font-medium italic">
+                            Configure como a sua loja cobra pela entrega dos pedidos ("Receber em Casa").
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => setTipoTaxaEntrega('FIXA')}
+                                className={`p-4 rounded-2xl border-2 font-bold text-center transition-all ${tipoTaxaEntrega === 'FIXA' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                            >
+                                Taxa Única (Fixa)
+                            </button>
+                            <button
+                                onClick={() => setTipoTaxaEntrega('BAIRRO')}
+                                className={`p-4 rounded-2xl border-2 font-bold text-center transition-all ${tipoTaxaEntrega === 'BAIRRO' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                            >
+                                Taxas por Bairro
+                            </button>
+                        </div>
+
+                        {tipoTaxaEntrega === 'FIXA' ? (
+                            <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-3 animate-slide-up">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Valor da Taxa de Entrega Padrão (R$)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">R$</span>
+                                    <input
+                                        type="text"
+                                        value={taxaEntregaFixa}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                            setTaxaEntregaFixa(val);
+                                        }}
+                                        className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-bold text-gray-900 text-lg"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2 ml-2">Este valor será cobrado sempre que o cliente escolher "Entrega".</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 animate-slide-up">
+                                <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-3">
+                                    <h4 className="text-sm font-bold text-gray-900 uppercase italic">Adicionar Área de Entrega</h4>
+                                    <div className="flex flex-col md:flex-row gap-3">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={novoBairroNome}
+                                                onChange={(e) => setNovoBairroNome(e.target.value)}
+                                                placeholder="Nome do Bairro"
+                                                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-bold"
+                                            />
+                                        </div>
+                                        <div className="w-full md:w-32 relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-gray-400 text-sm">R$</span>
+                                            <input
+                                                type="text"
+                                                value={novoBairroTaxa}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                                    setNovoBairroTaxa(val);
+                                                }}
+                                                placeholder="Taxa"
+                                                className="w-full pl-9 pr-3 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-bold text-center"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleAddBairro}
+                                            disabled={!novoBairroNome || !novoBairroTaxa || isAddingBairro}
+                                            className="bg-primary text-white px-6 py-3 rounded-xl font-bold uppercase text-xs flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                                        >
+                                            <Plus size={16} /> Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Bairros Cadastrados ({bairros.length})</h4>
+                                    {bairros.length === 0 ? (
+                                        <div className="text-center p-6 bg-white border border-dashed border-gray-200 rounded-2xl">
+                                            <p className="text-gray-400 font-medium text-sm">Nenhum bairro cadastrado ainda.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {bairros.map((b) => (
+                                                <div key={b.id} className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:border-gray-200 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                            <MapPin size={14} className="text-gray-400" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-gray-900 text-sm truncate">{b.nome}</p>
+                                                            <p className="text-xs text-green-600 font-bold">R$ {parseFloat(b.taxa).toFixed(2)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRemoveBairro(b.id)}
+                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

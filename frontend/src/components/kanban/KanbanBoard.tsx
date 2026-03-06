@@ -18,6 +18,7 @@ interface Pedido {
     criado_em: string;
     endereco: string;
     forma_pagamento: string;
+    tipo: string;
     itens: any[];
 }
 
@@ -41,8 +42,19 @@ export const KanbanBoard = () => {
     const [storeConfig, setStoreConfig] = useState<any>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
 
+    // Drag & Drop State
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+
     // Date Filters
-    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const getLocalDateString = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString(new Date()));
     const [isStoreLoaded, setIsStoreLoaded] = useState(false);
 
     const router = useRouter();
@@ -114,9 +126,9 @@ export const KanbanBoard = () => {
                 if (currentHour < shiftStartHour) {
                     const yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    setSelectedDate(yesterday.toISOString().split('T')[0]);
+                    setSelectedDate(getLocalDateString(yesterday));
                 } else {
-                    setSelectedDate(now.toISOString().split('T')[0]);
+                    setSelectedDate(getLocalDateString(now));
                 }
             }
         });
@@ -205,10 +217,9 @@ export const KanbanBoard = () => {
 
     useEffect(() => {
         // Socket updates mostly append 'today's' orders.
-        // Needs handling if we are viewing past dates? 
-        // For now, let's allow live updates to appear at top, user will realize.
         if (lastMessage) {
-            if (lastMessage.created) {
+            // New order received
+            if (lastMessage.is_new || lastMessage.created === true) {
                 setPedidos(prev => {
                     const alreadyExists = prev.some(p => p.id === lastMessage.id);
                     if (alreadyExists) return prev;
@@ -216,6 +227,7 @@ export const KanbanBoard = () => {
                 });
                 playAlert();
             } else {
+                // Update received
                 setPedidos(prev => prev.map(p =>
                     p.id === lastMessage.id ? { ...p, ...lastMessage } : p
                 ));
@@ -262,20 +274,31 @@ export const KanbanBoard = () => {
     const handleAdvanceStatus = async (pedido: Pedido) => {
         // Permission Check for Drivers
         if (userRole === 'driver') {
-            if (pedido.status !== 'PRONTO' && pedido.status !== 'DESPACHADO') {
-                alert('Entregadores só podem mover pedidos Prontos ou em Entrega.');
+            if (pedido.status !== 'PRONTO') {
+                alert('Entregadores só podem mover pedidos de Prontos para Entrega.');
                 return;
             }
         }
 
-        const statusFlow: Record<string, string> = {
-            'NOVO': 'PREPARO',
-            'PREPARO': 'PRONTO',
-            'PRONTO': 'DESPACHADO',
-            'DESPACHADO': 'FINALIZADO'
-        };
+        // Permission Check for Waiters
+        if (userRole === 'waiter') {
+            alert('Atendentes não podem avançar pedidos no Kanban. Pedidos em produção devem ser controlados pela cozinha.');
+            return;
+        }
 
-        const nextStatus = statusFlow[pedido.status];
+        let nextStatus = '';
+        if (pedido.status === 'NOVO') nextStatus = 'PREPARO';
+        else if (pedido.status === 'PREPARO') nextStatus = 'PRONTO';
+        else if (pedido.status === 'PRONTO') {
+            if (pedido.tipo !== 'ENTREGA') {
+                nextStatus = 'FINALIZADO';
+            } else {
+                nextStatus = 'DESPACHADO';
+            }
+        } else if (pedido.status === 'DESPACHADO') {
+            nextStatus = 'FINALIZADO';
+        }
+
         if (!nextStatus) return;
 
         try {
@@ -296,6 +319,67 @@ export const KanbanBoard = () => {
             }
         } catch (error) {
             console.error('Error advancing status:', error);
+        }
+    };
+
+    // Drag & Drop Handlers
+    const canDragAndDrop = userRole === 'owner' || userRole === 'manager' || userRole === 'cashier';
+
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
+        if (!canDragAndDrop) return;
+        e.dataTransfer.setData('text/plain', id.toString());
+        setIsDragging(true);
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>, colId: string) => {
+        e.preventDefault();
+        if (!canDragAndDrop) return;
+        if (dragOverCol !== colId) {
+            setDragOverCol(colId);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setDragOverCol(null);
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>, colId: string) => {
+        e.preventDefault();
+        setIsDragging(false);
+        setDragOverCol(null);
+        if (!canDragAndDrop) return;
+
+        const pedidoIdStr = e.dataTransfer.getData('text/plain');
+        if (!pedidoIdStr) return;
+        const pedidoId = parseInt(pedidoIdStr);
+
+        const pedido = pedidos.find(p => p.id === pedidoId);
+        if (!pedido || pedido.status === colId) return;
+
+        // Optimistic UI update
+        const previousPedidos = [...pedidos];
+        setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: colId } : p));
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/pedidos/${pedidoId}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: colId })
+            });
+
+            if (!response.ok) {
+                // Revert on failure
+                setPedidos(previousPedidos);
+                alert('Erro ao atualizar status do pedido.');
+            }
+        } catch (error) {
+            console.error('Error dropping status:', error);
+            setPedidos(previousPedidos);
         }
     };
 
@@ -350,7 +434,7 @@ export const KanbanBoard = () => {
             </div>
 
             <div className="flex-1 overflow-x-auto p-6">
-                <div className="flex gap-6 h-full min-w-max">
+                <div className="flex gap-6 h-full min-w-max lg:min-w-0 lg:w-full">
                     {COLUMNS
                         .filter(col => {
                             if (userRole === 'driver') {
@@ -359,7 +443,13 @@ export const KanbanBoard = () => {
                             return true;
                         })
                         .map(column => (
-                            <div key={column.id} className={`w-80 rounded-[2rem] flex flex-col ${column.color} shadow-sm border border-white/50`}>
+                            <div
+                                key={column.id}
+                                onDragOver={(e) => handleDragOver(e, column.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, column.id)}
+                                className={`w-80 lg:w-full lg:flex-1 rounded-[2rem] flex flex-col transition-all duration-300 ${dragOverCol === column.id ? 'ring-4 ring-primary ring-opacity-50 scale-[1.02]' : ''} ${column.color} shadow-sm border border-white/50`}
+                            >
                                 <div className="p-6 flex justify-between items-center border-b border-gray-200/50">
                                     <h2 className="font-black text-gray-700 uppercase tracking-widest text-xs flex items-center gap-2">
                                         <div className={`w-2 h-2 rounded-full ${column.id === 'NOVO' ? 'bg-blue-500' :
@@ -375,7 +465,7 @@ export const KanbanBoard = () => {
                                     </span>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                                <div className={`flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4 transition-all duration-300 ${isDragging && dragOverCol === column.id ? 'bg-white/40' : ''}`}>
                                     {pedidos
                                         .filter(p => p.status === column.id)
                                         .map(pedido => (
@@ -384,11 +474,13 @@ export const KanbanBoard = () => {
                                                 pedido={pedido}
                                                 onVerPedido={handleVerPedido}
                                                 onAvançar={() => handleAdvanceStatus(pedido)}
+                                                draggable={canDragAndDrop}
+                                                onDragStart={handleDragStart}
                                             />
                                         ))
                                     }
                                     {pedidos.filter(p => p.status === column.id).length === 0 && (
-                                        <div className="h-full flex flex-col items-center justify-center opacity-30 space-y-2">
+                                        <div className="h-full min-h-[100px] flex flex-col items-center justify-center opacity-30 space-y-2 pointer-events-none">
                                             <div className="w-12 h-12 bg-gray-900/5 rounded-full"></div>
                                             <p className="text-xs font-black uppercase tracking-widest text-gray-900">Vazio</p>
                                         </div>
