@@ -66,7 +66,7 @@ def notify_order_change(sender, instance, created, **kwargs):
     if not created and instance.cliente_whatsapp and instance.loja.evolution_instance:
         # Check if the plan allows WhatsApp automation
         recursos = instance.loja.plano.recursos if instance.loja.plano else {}
-        if not recursos.get('whatsapp_automation'):
+        if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation'):
             logger.info(f"WhatsApp automation disabled for plan {instance.loja.plano.nome if instance.loja.plano else 'None'}")
             return
 

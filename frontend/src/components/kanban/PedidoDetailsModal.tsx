@@ -187,67 +187,67 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 shadow-none" onClick={onClose}>
-            <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col animate-slide-up overflow-hidden ring-1 ring-gray-200" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 shadow-none" onClick={onClose}>
+            <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl flex flex-col animate-slide-up overflow-hidden ring-1 ring-gray-200" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
-                <div className="p-6 border-b flex justify-between items-start bg-gray-50/50">
+                <div className="p-4 sm:p-6 border-b flex justify-between items-start bg-gray-50/50">
                     <div className="space-y-1">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-900 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-lg">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <div className="bg-gray-900 text-white w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shadow-lg">
                                 #{pedido.numero_diario || pedido.id}
                             </div>
-                            <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-sm ${STATUS_COLORS[pedido.status] || 'bg-gray-100 text-gray-500'}`}>
+                            <span className={`text-[10px] sm:text-xs font-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-full uppercase tracking-widest shadow-sm ${STATUS_COLORS[pedido.status] || 'bg-gray-100 text-gray-500'}`}>
                                 {STATUS_LABELS[pedido.status] || pedido.status}
                             </span>
                             {pedido.origem === 'IFOOD' && (
-                                <span className="text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest bg-red-600 text-white shadow-sm flex items-center gap-1">
-                                    <ShoppingBag size={12} /> iFood
+                                <span className="text-[9px] sm:text-[10px] font-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-full uppercase tracking-widest bg-red-600 text-white shadow-sm flex items-center gap-1">
+                                    <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> iFood
                                 </span>
                             )}
                         </div>
-                        <p className="text-xs font-bold text-gray-400 pl-1">
+                        <p className="text-[10px] sm:text-xs font-bold text-gray-400 pl-1">
                             Recebido há {timeString}
                         </p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors group">
-                        <X size={24} className="text-gray-400 group-hover:text-gray-600" />
+                    <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-full transition-colors group shrink-0">
+                        <X size={20} className="sm:w-6 sm:h-6 text-gray-400 group-hover:text-gray-600" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8 custom-scrollbar">
 
                     {/* Customer & Payment Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                         {/* Customer */}
-                        <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <Clock size={12} /> Cliente
+                        <div className="space-y-2 sm:space-y-3">
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <Clock size={10} className="sm:w-3 sm:h-3" /> Cliente
                             </h3>
-                            <div className="bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                                <p className="font-bold text-lg text-gray-900 leading-tight">{pedido.cliente_nome}</p>
+                            <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                                <p className="font-bold text-base sm:text-lg text-gray-900 leading-tight truncate">{pedido.cliente_nome}</p>
                                 <a
                                     href={`https://wa.me/${pedido.cliente_whatsapp}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex items-center gap-2 text-green-600 text-sm font-bold hover:underline mt-2 bg-green-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="inline-flex items-center gap-1.5 text-green-600 text-xs sm:text-sm font-bold hover:underline mt-2 bg-green-50 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg transition-colors"
                                 >
-                                    <Phone size={14} /> {pedido.cliente_whatsapp}
+                                    <Phone size={12} className="sm:w-3.5 sm:h-3.5" /> {pedido.cliente_whatsapp}
                                 </a>
                             </div>
                         </div>
 
                         {/* Payment */}
-                        <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <CreditCard size={12} /> Pagamento
+                        <div className="space-y-2 sm:space-y-3">
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <CreditCard size={10} className="sm:w-3 sm:h-3" /> Pagamento
                             </h3>
-                            <div className="bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col justify-center">
-                                <p className="font-black text-lg text-gray-800 uppercase tracking-tight">{pedido.forma_pagamento}</p>
-                                <div className="flex justify-between items-end mt-2">
-                                    <span className="text-xs text-gray-400 font-bold uppercase">Total</span>
-                                    <span className="text-xl font-black text-gray-900">R$ {pedido.total}</span>
+                            <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col justify-center">
+                                <p className="font-black text-base sm:text-lg text-gray-800 uppercase tracking-tight">{pedido.forma_pagamento}</p>
+                                <div className="flex justify-between items-end mt-1 sm:mt-2">
+                                    <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase">Total</span>
+                                    <span className="text-lg sm:text-xl font-black text-gray-900 leading-none">R$ {pedido.total}</span>
                                 </div>
                             </div>
                         </div>
@@ -255,77 +255,77 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
 
                     {/* Address / Type Info */}
                     {(pedido.tipo === 'ENTREGA' || pedido.endereco) ? (
-                        <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <MapPin size={12} /> Endereço de Entrega
+                        <div className="space-y-2 sm:space-y-3">
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <MapPin size={10} className="sm:w-3 sm:h-3" /> Endereço de Entrega
                             </h3>
-                            <div className="bg-blue-50/50 p-5 rounded-[1.5rem] border border-blue-100 text-blue-900 font-bold relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <MapPin size={48} />
+                            <div className="bg-blue-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-blue-100 text-blue-900 font-bold relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <MapPin size={32} className="sm:w-12 sm:h-12" />
                                 </div>
-                                <p className="leading-relaxed relative z-10">{pedido.endereco || 'Endereço não informado'}</p>
+                                <p className="leading-relaxed relative z-10 text-sm sm:text-base">{pedido.endereco || 'Endereço não informado'}</p>
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <ShoppingBag size={12} /> Local do Pedido
+                        <div className="space-y-2 sm:space-y-3">
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> Local do Pedido
                             </h3>
-                            <div className="bg-purple-50/50 p-5 rounded-[1.5rem] border border-purple-100 text-purple-900 font-bold">
-                                <p className="leading-relaxed">Consumo Local / Balcão</p>
+                            <div className="bg-purple-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-purple-100 text-purple-900 font-bold">
+                                <p className="leading-relaxed text-sm sm:text-base">Consumo Local / Balcão</p>
                             </div>
                         </div>
                     )}
 
                     {/* Order Observations */}
                     {pedido.observacoes && (
-                        <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <AlertCircle size={12} /> Observações Gerais
+                        <div className="space-y-2 sm:space-y-3">
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <AlertCircle size={10} className="sm:w-3 sm:h-3" /> Observações Gerais
                             </h3>
-                            <div className="bg-amber-50/50 p-5 rounded-[1.5rem] border border-amber-100 text-amber-900 font-bold">
-                                <p className="leading-relaxed whitespace-pre-line">{pedido.observacoes}</p>
+                            <div className="bg-amber-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-amber-100 text-amber-900 font-bold">
+                                <p className="leading-relaxed whitespace-pre-line text-xs sm:text-base">{pedido.observacoes}</p>
                             </div>
                         </div>
                     )}
 
                     {/* Items */}
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <ShoppingBag size={12} /> Itens do Pedido
+                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> Itens do Pedido
                             </h3>
-                            <span className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-500">{(pedido.itens || []).length} itens</span>
+                            <span className="text-[9px] sm:text-[10px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-500">{(pedido.itens || []).length} itens</span>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-2 sm:space-y-4">
                             {(pedido.itens || []).map((item, idx) => (
-                                <div key={idx} className="flex gap-5 p-5 rounded-[1.5rem] border border-gray-100 bg-white shadow-sm hover:border-gray-200 transition-colors">
-                                    <div className="bg-gray-50 w-12 h-12 rounded-2xl flex items-center justify-center font-black text-gray-400 border border-gray-100 text-lg shadow-inner">
+                                <div key={idx} className="flex gap-3 sm:gap-5 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 bg-white shadow-sm hover:border-gray-200 transition-colors">
+                                    <div className="bg-gray-50 w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl flex items-center justify-center font-black text-gray-400 border border-gray-100 text-sm sm:text-lg shadow-inner shrink-0">
                                         {item.quantidade}x
                                     </div>
-                                    <div className="flex-1 space-y-1">
-                                        <p className="font-bold text-gray-900 text-lg leading-tight">
+                                    <div className="flex-1 space-y-1 min-w-0">
+                                        <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight truncate">
                                             {item.produto_obj?.nome || `Produto #${item.id}`}
                                         </p>
 
                                         {item.selecoes && item.selecoes.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
+                                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1 sm:mt-2">
                                                 {item.selecoes.map((sel: any, i: number) => (
-                                                    <span key={i} className="text-[11px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                                                    <span key={i} className="text-[9px] sm:text-[11px] font-bold text-gray-500 bg-gray-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg border border-gray-100">
                                                         {sel.opcao}
                                                     </span>
                                                 ))}
                                             </div>
                                         )}
                                         {item.observacoes && (
-                                            <div className="flex items-start gap-2 mt-2 text-amber-600 bg-amber-50 p-2 rounded-lg text-xs font-bold border border-amber-100">
-                                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                                                <span>Obs: {item.observacoes}</span>
+                                            <div className="flex items-start gap-1.5 sm:gap-2 mt-1 sm:mt-2 text-amber-600 bg-amber-50 p-1.5 sm:p-2 rounded-lg text-[10px] sm:text-xs font-bold border border-amber-100">
+                                                <AlertCircle size={12} className="mt-0.5 shrink-0 sm:w-3.5 sm:h-3.5" />
+                                                <span className="leading-tight">Obs: {item.observacoes}</span>
                                             </div>
                                         )}
                                     </div>
-                                    <div className="font-black text-gray-900 text-lg">
+                                    <div className="font-black text-gray-900 text-sm sm:text-lg shrink-0">
                                         R$ {item.preco_unitario}
                                     </div>
                                 </div>
@@ -335,15 +335,15 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 bg-gray-50/80 backdrop-blur border-t flex justify-between gap-4">
+                <div className="p-4 sm:p-6 bg-gray-50/80 backdrop-blur border-t flex flex-col-reverse sm:flex-row justify-between gap-3 sm:gap-4 shrink-0">
                     <button
                         onClick={handlePrint}
-                        className="px-6 py-4 rounded-2xl font-black text-blue-600 text-xs hover:bg-blue-50 transition-colors uppercase tracking-widest flex items-center gap-2"
+                        className="px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-blue-600 text-[10px] sm:text-xs hover:bg-blue-50 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 border border-blue-100 sm:border-transparent bg-white sm:bg-transparent"
                     >
-                        <Printer size={16} /> Imprimir Comanda
+                        <Printer size={14} className="sm:w-4 sm:h-4" /> Imprimir Comanda
                     </button>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 sm:flex-none">
                         <button
                             onClick={() => {
                                 if (window.confirm('Tem certeza que deseja cancelar este pedido?')) {
@@ -351,7 +351,7 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                                 }
                             }}
                             disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                            className="px-6 py-4 rounded-2xl font-black text-red-500 text-xs hover:bg-red-50 transition-colors uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-red-500 text-[10px] sm:text-xs hover:bg-red-50 transition-colors uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed border border-red-100 sm:border-transparent bg-white sm:bg-transparent"
                         >
                             Cancelar Pedido
                         </button>
@@ -360,10 +360,10 @@ export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDe
                             <button
                                 onClick={handleNextStatus}
                                 disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                                className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="px-4 sm:px-8 py-3 sm:py-4 bg-gray-900 text-white rounded-xl sm:rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-xl sm:hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 group disabled:opacity-30 disabled:cursor-not-allowed w-full sm:w-auto"
                             >
                                 <span>Avançar para {STATUS_LABELS[['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'][['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'].indexOf(pedido.status) + 1]]}</span>
-                                <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                                <ChevronRight size={14} className="sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" />
                             </button>
                         )}
                     </div>

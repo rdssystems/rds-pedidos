@@ -165,9 +165,11 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'ifood_client_id', 'ifood_client_secret', 'ifood_merchant_id', 'ifood_active',
             'notificar_preparo', 'notificar_entrega', 'notificar_finalizado',
             'msg_preparo', 'msg_entrega', 'msg_finalizado',
-            'plano', 'plano_details', 'status_assinatura', 'valido_ate',
+            'plano', 'plano_details', 'plano_tipo', 'status_assinatura', 'valido_ate',
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
-            'categorias', 'bairros_entrega'
+            'categorias', 'bairros_entrega',
+            'bot_ativo_whatsapp', 'bot_personalidade', 'bot_conhecimento', 'bot_alerta_transbordo',
+            'modo_catalogo', 'quantidade_mesas'
         ]
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
@@ -234,7 +236,15 @@ class MovimentacaoCaixaSerializer(serializers.ModelSerializer):
 class CaixaSerializer(serializers.ModelSerializer):
     movimentacoes = MovimentacaoCaixaSerializer(many=True, read_only=True)
     operador_nome = serializers.CharField(source='operador.username', read_only=True)
+    saldo_atual = serializers.SerializerMethodField()
     
     class Meta:
         model = Caixa
         fields = '__all__'
+
+    def get_saldo_atual(self, obj):
+        from django.db.models import Sum
+        from decimal import Decimal
+        total_entradas = obj.movimentacoes.filter(tipo__in=['ABERTURA', 'VENDA', 'SUPRIMENTO']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+        total_saidas = obj.movimentacoes.filter(tipo__in=['SANGRIA']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+        return float(total_entradas - total_saidas)

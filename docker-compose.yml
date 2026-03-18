@@ -27,8 +27,8 @@ services:
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://postgres:postgres@db:5432/postgres
       - REDIS_ENABLED=true
-      - REDIS_URI=redis://gerenciador-redis:6379/2
-      - CACHE_REDIS_URI=redis://gerenciador-redis:6379/2
+      - REDIS_URI=redis://redis:6379/2
+      - CACHE_REDIS_URI=redis://redis:6379/2
       - DEL_INSTANCE=false
       - SERVER_URL=http://localhost:8081
     depends_on:
@@ -62,7 +62,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - MERCADO_PAGO_PUBLIC_KEY=${MERCADO_PAGO_PUBLIC_KEY}
       - MERCADO_PAGO_ACCESS_TOKEN=${MERCADO_PAGO_ACCESS_TOKEN}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
     depends_on:
       - db
       - redis
@@ -72,21 +74,24 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: gerenciador-frontend
-    user: root
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+    container_name: rds-frontend
     environment:
       - NEXT_PUBLIC_API_URL=${API_URL:-http://localhost/api}
-      - WATCHPACK_POLLING=true
-      - NODE_ENV=development
+      - NODE_ENV=production
       - HOSTNAME=0.0.0.0
     depends_on:
       - backend
       - redis
+    restart: always
+
+  landing-page:
+    build:
+      context: ./landing-page
+      dockerfile: Dockerfile
+    container_name: rds-landing
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
     restart: always
 
   nginx:
@@ -101,5 +106,6 @@ services:
     depends_on:
       - backend
       - frontend
+      - landing-page
       - redis
     restart: always

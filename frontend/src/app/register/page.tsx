@@ -56,7 +56,7 @@ export default function RegisterPage() {
 
                         if (tokenRes.ok) {
                             const tokenData = await tokenRes.json();
-                            login(email, tokenData.access);
+                            login(tokenData.access);
                             router.push('/dashboard');
                         } else {
                             router.push('/login');

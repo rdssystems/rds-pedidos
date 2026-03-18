@@ -37,7 +37,7 @@ export default function LoginPage() {
         } catch (err) {
             // Fallback for dev environment if API is not fully configured
             if (username === 'admin' && password === 'admin') {
-                login(username, 'dev-token');
+                login('dev-token');
                 router.push('/orders');
             } else {
                 setError('Erro ao conectar com o servidor.');

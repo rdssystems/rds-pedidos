@@ -194,7 +194,7 @@ export const OrderListSimplified = () => {
     }
 
     return (
-        <div className="p-6 max-w-5xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
             <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 className="text-2xl font-black italic uppercase text-gray-900 tracking-tighter">Fila de Pedidos</h1>
@@ -242,36 +242,36 @@ export const OrderListSimplified = () => {
                         <div
                             key={pedido.id}
                             onClick={() => setSelectedPedido(pedido)}
-                            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md transition-shadow cursor-pointer group"
+                            className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-md transition-shadow cursor-pointer group"
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-gray-50 rounded-xl flex flex-col items-center justify-center border border-gray-100 group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors">
-                                    <span className="text-[10px] font-bold text-gray-400 leading-none">#</span>
-                                    <span className="text-lg font-black text-gray-900 leading-none">{pedido.numero_diario || pedido.id}</span>
+                            <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-lg sm:rounded-xl flex flex-col items-center justify-center border border-gray-100 group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors shrink-0">
+                                    <span className="text-[8px] sm:text-[10px] font-bold text-gray-400 leading-none">#</span>
+                                    <span className="text-base sm:text-lg font-black text-gray-900 leading-none">{pedido.numero_diario || pedido.id}</span>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                        {pedido.cliente_nome}
-                                        {pedido.tipo === 'ENTREGA' && <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-black uppercase">Entrega</span>}
-                                        {pedido.tipo === 'RETIRADA' && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase">Retirada</span>}
-                                        {pedido.tipo === 'BALCAO' && <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-black uppercase">Balcão</span>}
-                                        {pedido.tipo === 'MESA' && <span className="text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-black uppercase">Mesa</span>}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-sm sm:text-base text-gray-900 flex items-center gap-2 truncate">
+                                        <span className="truncate">{pedido.cliente_nome}</span>
+                                        {pedido.tipo === 'ENTREGA' && <span className="text-[8px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Entrega</span>}
+                                        {pedido.tipo === 'RETIRADA' && <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Retirada</span>}
+                                        {pedido.tipo === 'BALCAO' && <span className="text-[8px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Balcão</span>}
+                                        {pedido.tipo === 'MESA' && <span className="text-[8px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Mesa</span>}
                                     </h3>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${STATUS_LABELS[pedido.status]?.bg} ${STATUS_LABELS[pedido.status]?.color}`}>
+                                        <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${STATUS_LABELS[pedido.status]?.bg} ${STATUS_LABELS[pedido.status]?.color}`}>
                                             {STATUS_LABELS[pedido.status]?.label || pedido.status}
                                         </span>
-                                        <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
-                                            <Clock size={12} /> {new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                        <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1 font-medium">
+                                            <Clock size={10} className="sm:w-3 sm:h-3" /> {new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
-                                <div className="text-right">
-                                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</span>
-                                    <span className="text-lg font-black text-primary">R$ {parseFloat(pedido.total).toFixed(2)}</span>
+                            <div className="flex items-center justify-between sm:justify-end gap-4 mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-50">
+                                <div className="text-left sm:text-right">
+                                    <span className="block text-[8px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Total</span>
+                                    <span className="text-sm sm:text-lg font-black text-red-500 leading-none">R$ {parseFloat(pedido.total).toFixed(2)}</span>
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -279,13 +279,13 @@ export const OrderListSimplified = () => {
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleFinalizar(pedido.id); }}
                                             disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                                            className="bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            className="bg-green-500 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                                         >
-                                            <CheckCircle2 size={16} /> Finalizar
+                                            <CheckCircle2 size={14} className="sm:w-4 sm:h-4" /> Finalizar
                                         </button>
                                     )}
-                                    <button className="p-2 text-gray-400 group-hover:text-primary hover:bg-gray-50 rounded-lg transition-all">
-                                        <ChevronRight size={20} />
+                                    <button className="p-1 sm:p-2 text-gray-400 group-hover:text-primary hover:bg-gray-50 rounded-lg transition-all mt-0">
+                                        <ChevronRight size={16} className="sm:w-5 sm:h-5" />
                                     </button>
                                 </div>
                             </div>

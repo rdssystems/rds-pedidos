@@ -6,7 +6,7 @@ from .views import (
     ProdutoViewSet, GrupoDeAtributosViewSet, AtributoOpcaoViewSet,
     TeamMemberViewSet, RegisterView, api_status, UserViewSet,
     DashboardStatsView, CaixaViewSet, BairroEntregaViewSet,
-    MercadoPagoWebhookView
+    MercadoPagoWebhookView, WebhookEvolutionView
 )
 
 router = DefaultRouter()
@@ -35,4 +35,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view({'post': 'create'}), name='register'),
     path('api/mp-webhook/', MercadoPagoWebhookView.as_view(), name='mp-webhook'),
+    path('api/evolution/webhook/<str:instancia>/', WebhookEvolutionView.as_view(), name='evolution-webhook'),
 ]

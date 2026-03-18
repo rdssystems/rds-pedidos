@@ -7,6 +7,8 @@ import { useSocket } from './SocketContext';
 interface Caixa {
     id: number;
     saldo_inicial: string;
+    saldo_atual: number;
+    data_abertura: string;
     status: 'ABERTO' | 'FECHADO';
 }
 
@@ -34,9 +36,11 @@ interface PosContextType {
     addToCart: (product: any, selecoes?: any[], observacoes?: string) => void;
     removeFromCart: (uuid: string) => void;
     clearCart: () => void;
-    checkout: (paymentMethod: string, amountPaid: number, cliente?: any) => Promise<any>;
+    checkout: (paymentMethod: string, amountPaid: number, cliente?: any, orderObs?: string) => Promise<any>;
     loadTableOrders: (mesaNum: number) => Promise<void>;
     sendToKitchen: (clientInfo?: any, orderObs?: string) => Promise<any>;
+    registrarSangria: (valor: number, descricao: string) => Promise<void>;
+    registrarSuprimento: (valor: number, descricao: string) => Promise<void>;
 }
 
 const PosContext = createContext<PosContextType>({} as PosContextType);
@@ -199,6 +203,42 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         setCaixa(null);
     };
 
+    const registrarSangria = async (valor: number, descricao: string) => {
+        if (!caixa) throw new Error("Caixa fechado");
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/caixa/${caixa.id}/sangria/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ valor, descricao })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Erro ao registrar sangria');
+        }
+        await fetchCaixa();
+    };
+
+    const registrarSuprimento = async (valor: number, descricao: string) => {
+        if (!caixa) throw new Error("Caixa fechado");
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/caixa/${caixa.id}/suprimento/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ valor, descricao })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Erro ao registrar suprimento');
+        }
+        await fetchCaixa();
+    };
+
     const addToCart = (product: any, selecoes: any[] = [], observacoes: string = '') => {
         setCart(prev => {
             // Check if exact same item (product + attributes + obs) already in cart
@@ -282,6 +322,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         setActiveMesaOrders([]);
         setActiveMesaNum(null);
         clearCart();
+        await fetchCaixa();
         return data;
     };
 
@@ -291,7 +332,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         const token = localStorage.getItem('token');
 
         // Fetch all non-finalized orders for this mesa
-        const res = await fetch(`/api/pedidos/?loja_id=${storeId}&mesa=${mesaNum}&status__in=NOVO,PREPARO,DESPACHADO`, {
+        const res = await fetch(`/api/pedidos/?loja_id=${storeId}&mesa=${mesaNum}&status__in=NOVO,PREPARO,PRONTO,DESPACHADO`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -392,7 +433,8 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         <PosContext.Provider value={{
             caixa, isLoading, cart, total, products,
             abrirCaixa, fecharCaixa, refreshCaixa: fetchCaixa, refreshProducts: fetchProducts,
-            addToCart, removeFromCart, clearCart, checkout, loadTableOrders, sendToKitchen
+            addToCart, removeFromCart, clearCart, checkout, loadTableOrders, sendToKitchen,
+            registrarSangria, registrarSuprimento
         }}>
             {children}
         </PosContext.Provider>

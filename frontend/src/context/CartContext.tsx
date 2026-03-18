@@ -10,6 +10,7 @@ interface CartItem {
     quantidade: number;
     atributos: {
         grupoId: number;
+        grupoNome: string;
         opcaoId: number;
         nome: string;
         preco: number;

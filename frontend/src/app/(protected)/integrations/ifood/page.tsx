@@ -168,20 +168,7 @@ export default function IFoodPage() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-red-100 rounded-xl">
-                            <ShoppingBag className="text-red-600" size={24} />
-                        </div>
-                        <h1 className="text-3xl font-black text-gray-900 italic uppercase tracking-tighter">
-                            iFood <span className="text-red-600">Connect</span>
-                        </h1>
-                    </div>
-                    <p className="text-gray-500 mt-2 font-medium italic">Gerencie sua operação do iFood diretamente pelo painel.</p>
-                </div>
-            </header>
+        <div className="p-8 max-w-4xl mx-auto space-y-8 mt-4">
 
             {message && (
                 <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'

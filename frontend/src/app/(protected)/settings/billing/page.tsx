@@ -26,15 +26,15 @@ const plans = [
         icon: <Rocket className="text-blue-500" size={24} />,
         color: 'blue',
         features: [
-            'Gestão de Pedidos (Kanban)',
-            'Mesas e Comandas',
-            'Cardápio Digital QR Code',
+            'Cardápio Digital',
             'Cadastro de Produtos Ilimitado',
-            '1 Usuário Logado',
+            '1 Conta de Equipe',
             'Suporte via E-mail'
         ],
         notIncluded: [
-            'Integração iFood',
+            'Gestão de Pedidos (Kanban)',
+            'Mesas e Comandas',
+            'Integração iFood (Em breve)',
             'WhatsApp Bot',
             'Gestão de Estoque',
             'Multi-lojas'
@@ -52,10 +52,12 @@ const plans = [
         popular: true,
         features: [
             'Tudo do Plano Start',
-            'Integração iFood Oficial',
+            'Gestão de Pedidos (Kanban)',
+            'Mesas e Comandas',
+            'Integração iFood Oficial (Em breve)',
             'WhatsApp Bot (Automação)',
             'Relatórios de Vendas',
-            'Até 5 Usuários Logados',
+            '3 Contas de Equipe',
             'Suporte Prioritário WhatsApp'
         ],
         notIncluded: [
@@ -76,6 +78,7 @@ const plans = [
             'Tudo do Plano Pro',
             'Módulo Multi-lojas',
             'Gestão de Estoque Avançada',
+            'Atendente de I.A no WhatsApp',
             'Dashboard de BI (Analytics)',
             'Usuários Ilimitados',
             'Gerente de Conta Exclusivo'
@@ -233,7 +236,7 @@ export default function PlansPage() {
                         <ShoppingBag size={28} />
                     </div>
                     <div>
-                        <h4 className="font-black uppercase tracking-tight italic text-gray-900">Integração iFood</h4>
+                        <h4 className="font-black uppercase tracking-tight italic text-gray-900">Integração iFood (Em breve)</h4>
                         <p className="text-[10px] text-gray-400 font-medium italic">Receba pedidos automaticamente no seu Kanban.</p>
                     </div>
                 </div>

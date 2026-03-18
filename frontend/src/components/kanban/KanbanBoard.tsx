@@ -433,61 +433,86 @@ export const KanbanBoard = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-x-auto p-6">
-                <div className="flex gap-6 h-full min-w-max lg:min-w-0 lg:w-full">
-                    {COLUMNS
-                        .filter(col => {
-                            if (userRole === 'driver') {
-                                return col.id === 'PRONTO' || col.id === 'DESPACHADO';
-                            }
-                            return true;
-                        })
-                        .map(column => (
-                            <div
-                                key={column.id}
-                                onDragOver={(e) => handleDragOver(e, column.id)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, column.id)}
-                                className={`w-80 lg:w-full lg:flex-1 rounded-[2rem] flex flex-col transition-all duration-300 ${dragOverCol === column.id ? 'ring-4 ring-primary ring-opacity-50 scale-[1.02]' : ''} ${column.color} shadow-sm border border-white/50`}
-                            >
-                                <div className="p-6 flex justify-between items-center border-b border-gray-200/50">
-                                    <h2 className="font-black text-gray-700 uppercase tracking-widest text-xs flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${column.id === 'NOVO' ? 'bg-blue-500' :
-                                            column.id === 'PREPARO' ? 'bg-yellow-500' :
-                                                column.id === 'PRONTO' ? 'bg-indigo-500' :
-                                                    column.id === 'DESPACHADO' ? 'bg-orange-500' :
-                                                        'bg-green-500'
-                                            }`}></div>
-                                        {column.title}
-                                    </h2>
-                                    <span className="bg-white/80 px-3 py-1 rounded-xl text-xs font-black text-gray-400 shadow-sm backdrop-blur-sm">
-                                        {pedidos.filter(p => p.status === column.id).length}
-                                    </span>
-                                </div>
+            <div className="flex-1 overflow-hidden flex flex-col">
+                {/* Desktop Kanban View */}
+                <div className="hidden md:flex flex-1 overflow-x-auto p-6">
+                    <div className="flex gap-6 h-full min-w-max lg:min-w-0 lg:w-full">
+                        {COLUMNS
+                            .filter(col => {
+                                if (userRole === 'driver') {
+                                    return col.id === 'PRONTO' || col.id === 'DESPACHADO';
+                                }
+                                return true;
+                            })
+                            .map(column => (
+                                <div
+                                    key={column.id}
+                                    onDragOver={(e) => handleDragOver(e, column.id)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, column.id)}
+                                    className={`w-80 lg:w-full lg:flex-1 rounded-[2rem] flex flex-col transition-all duration-300 ${dragOverCol === column.id ? 'ring-4 ring-primary ring-opacity-50 scale-[1.02]' : ''} ${column.color} shadow-sm border border-white/50`}
+                                >
+                                    <div className="p-6 flex justify-between items-center border-b border-gray-200/50">
+                                        <h2 className="font-black text-gray-700 uppercase tracking-widest text-xs flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${column.id === 'NOVO' ? 'bg-blue-500' :
+                                                column.id === 'PREPARO' ? 'bg-yellow-500' :
+                                                    column.id === 'PRONTO' ? 'bg-indigo-500' :
+                                                        column.id === 'DESPACHADO' ? 'bg-orange-500' :
+                                                            'bg-green-500'
+                                                }`}></div>
+                                            {column.title}
+                                        </h2>
+                                        <span className="bg-white/80 px-3 py-1 rounded-xl text-xs font-black text-gray-400 shadow-sm backdrop-blur-sm">
+                                            {pedidos.filter(p => p.status === column.id).length}
+                                        </span>
+                                    </div>
 
-                                <div className={`flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4 transition-all duration-300 ${isDragging && dragOverCol === column.id ? 'bg-white/40' : ''}`}>
-                                    {pedidos
-                                        .filter(p => p.status === column.id)
-                                        .map(pedido => (
-                                            <PedidoCard
-                                                key={pedido.id}
-                                                pedido={pedido}
-                                                onVerPedido={handleVerPedido}
-                                                onAvançar={() => handleAdvanceStatus(pedido)}
-                                                draggable={canDragAndDrop}
-                                                onDragStart={handleDragStart}
-                                            />
-                                        ))
-                                    }
-                                    {pedidos.filter(p => p.status === column.id).length === 0 && (
-                                        <div className="h-full min-h-[100px] flex flex-col items-center justify-center opacity-30 space-y-2 pointer-events-none">
-                                            <div className="w-12 h-12 bg-gray-900/5 rounded-full"></div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-gray-900">Vazio</p>
-                                        </div>
-                                    )}
+                                    <div className={`flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4 transition-all duration-300 ${isDragging && dragOverCol === column.id ? 'bg-white/40' : ''}`}>
+                                        {pedidos
+                                            .filter(p => p.status === column.id)
+                                            .map(pedido => (
+                                                <PedidoCard
+                                                    key={pedido.id}
+                                                    pedido={pedido}
+                                                    onVerPedido={handleVerPedido}
+                                                    onAvançar={() => handleAdvanceStatus(pedido)}
+                                                    draggable={canDragAndDrop}
+                                                    onDragStart={handleDragStart}
+                                                />
+                                            ))
+                                        }
+                                        {pedidos.filter(p => p.status === column.id).length === 0 && (
+                                            <div className="h-full min-h-[100px] flex flex-col items-center justify-center opacity-30 space-y-2 pointer-events-none">
+                                                <div className="w-12 h-12 bg-gray-900/5 rounded-full"></div>
+                                                <p className="text-xs font-black uppercase tracking-widest text-gray-900">Vazio</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
+                    </div>
+                </div>
+
+                {/* Mobile Vertical List View */}
+                <div className="md:hidden flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                    {pedidos
+                        .filter(p => p.status !== 'FINALIZADO') // Filter out finished orders initially to not clutter
+                        .sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())
+                        .map(pedido => (
+                            <PedidoCard
+                                key={pedido.id}
+                                pedido={pedido}
+                                onVerPedido={handleVerPedido}
+                                onAvançar={() => handleAdvanceStatus(pedido)}
+                                draggable={false}
+                            />
                         ))}
+                    {pedidos.filter(p => p.status !== 'FINALIZADO').length === 0 && (
+                        <div className="h-full min-h-[200px] flex flex-col items-center justify-center opacity-50 space-y-4 pointer-events-none">
+                            <div className="w-16 h-16 bg-gray-900/5 rounded-full"></div>
+                            <p className="text-sm font-black uppercase tracking-widest text-gray-900">Nenhum Pedido Ativo</p>
+                        </div>
+                    )}
                 </div>
             </div>
 

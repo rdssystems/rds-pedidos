@@ -6,8 +6,20 @@ import { useBilling } from "@/context/BillingContext";
 import { AlertCircle, CreditCard, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
+import { useState, useEffect } from "react";
+
 export default function AdminOrdersPage() {
     const { store, loading } = useBilling();
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 1024); // Tablets and mobile usually below 1024px for Kanban
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     if (loading) {
         return (
@@ -41,11 +53,11 @@ export default function AdminOrdersPage() {
         );
     }
 
-    // Professional conditional rendering based on Plan
-    if (store.plano_details?.nome === 'Basic') {
+    // Use Simplified view (Generic Mode) on Mobile or for Basic Plan
+    if (store.plano_details?.nome === 'Basic' || isMobile) {
         return <OrderListSimplified />;
     }
 
-    // PRO gets the KanbanBoard
+    // PRO and ELITE get the KanbanBoard on Desktop
     return <KanbanBoard />;
 }

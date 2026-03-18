@@ -23,11 +23,17 @@ def run_cmd(ssh, cmd):
 
 def create_tar(tar_name, source_dirs):
     print(f"Criando {tar_name}...")
+    def filter_func(tarinfo):
+        exclude = ['node_modules', '.next', 'venv', '__pycache__', '.git', '.dockerignore', '.gitignore', 'app.tar.gz']
+        if any(ex in tarinfo.name for ex in exclude):
+            return None
+        return tarinfo
+
     with tarfile.open(tar_name, "w:gz") as tar:
         for folder in source_dirs:
             if os.path.exists(folder):
                 print(f"Adicionando {folder}...")
-                tar.add(folder, arcname=os.path.basename(folder))
+                tar.add(folder, arcname=os.path.basename(folder), filter=filter_func)
     print("Tar criado.")
 
 def main():

@@ -97,10 +97,20 @@ class ConfiguracaoLoja(models.Model):
     ifood_token = models.TextField(blank=True, null=True, help_text="Access Token do iFood")
     ifood_token_expires = models.DateTimeField(blank=True, null=True)
 
+    # AI Bot Integration (WhatsApp)
+    bot_ativo_whatsapp = models.BooleanField(default=False, help_text="Ativar o Atendente IA no WhatsApp")
+    bot_personalidade = models.CharField(max_length=500, blank=True, null=True, help_text="Instruções de tom de voz e personalidade")
+    bot_conhecimento = models.TextField(blank=True, null=True, help_text="Regras da casa e base de conhecimento extra")
+    bot_alerta_transbordo = models.CharField(max_length=500, blank=True, null=True, help_text="Critérios para a IA parar de responder e chamar um humano")
+
     # Notification Customization
     notificar_preparo = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido entrar em preparo")
     notificar_entrega = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido sair para entrega")
     notificar_finalizado = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido for finalizado")
+    
+    # QR Code & Catalog Features
+    modo_catalogo = models.BooleanField(default=False, help_text="Se ativado, o cardápio funcionará apenas para visualização")
+    quantidade_mesas = models.PositiveIntegerField(default=0, help_text="Número de mesas para geração de QR Codes")
 
     msg_preparo = models.TextField(
         default="Olá {cliente}! 👨‍🍳 Seu pedido #{numero} começou a ser preparado em *{loja}*. Em breve avisaremos quando sair para entrega!",
@@ -360,3 +370,16 @@ class MovimentacaoCaixa(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - R$ {self.valor}"
+
+class NotificacaoSistema(models.Model):
+    loja = models.ForeignKey(ConfiguracaoLoja, on_delete=models.CASCADE, related_name='notificacoes_sistema')
+    titulo = models.CharField(max_length=200)
+    mensagem = models.TextField()
+    lida = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f"Notificação: {self.titulo} - Loja {self.loja.nome}"

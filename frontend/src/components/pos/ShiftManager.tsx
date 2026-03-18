@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePos } from '@/context/PosContext';
 import { useAuth } from '@/context/AuthContext';
-import { Lock, Unlock, AlertTriangle, ChevronLeft, X } from 'lucide-react';
+import { Lock, Unlock, AlertTriangle, ChevronLeft, X, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
 export const ShiftManager = () => {
     const { user } = useAuth();
@@ -14,6 +14,12 @@ export const ShiftManager = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+
+    // Sangria/Suprimento states
+    const [isSangriaModalOpen, setIsSangriaModalOpen] = useState(false);
+    const [isSuprimentoModalOpen, setIsSuprimentoModalOpen] = useState(false);
+    const [movDescricao, setMovDescricao] = useState('');
+    const { registrarSangria, registrarSuprimento } = usePos();
 
     // Get active store ID from localStorage
     const activeStoreId = typeof window !== 'undefined' ? localStorage.getItem('activeStoreId') : null;
@@ -25,6 +31,13 @@ export const ShiftManager = () => {
         router.push('/dashboard');
     };
 
+    // Sugerir o saldo atual ao abrir o modal de fechamento
+    useEffect(() => {
+        if (isCloseModalOpen && caixa) {
+            setAmount(String(caixa.saldo_atual || 0));
+        }
+    }, [isCloseModalOpen, caixa]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -35,9 +48,18 @@ export const ShiftManager = () => {
             if (isNaN(val)) throw new Error("Valor inválido");
 
             if (caixa) {
-                await fecharCaixa(val);
+                if (isCloseModalOpen) {
+                    await fecharCaixa(val);
+                    setIsCloseModalOpen(false);
+                } else if (isSangriaModalOpen) {
+                    await registrarSangria(val, movDescricao || 'Sangria de Caixa');
+                    setIsSangriaModalOpen(false);
+                } else if (isSuprimentoModalOpen) {
+                    await registrarSuprimento(val, movDescricao || 'Suprimento de Caixa');
+                    setIsSuprimentoModalOpen(false);
+                }
                 setAmount('');
-                setIsCloseModalOpen(false);
+                setMovDescricao('');
             } else {
                 await abrirCaixa(val);
                 setAmount('');
@@ -100,21 +122,42 @@ export const ShiftManager = () => {
     }
 
     return (
-        <div className="flex items-center gap-2">
-            <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg flex items-center gap-3 font-bold text-sm shadow-sm border border-green-200">
-                <Unlock size={16} />
-                <span>Caixa Aberto: #{caixa.id}</span>
-                <span className="text-green-600 text-xs">Desde {new Date(caixa.data_abertura || '').toLocaleTimeString()}</span>
+        <div className="flex flex-wrap items-center gap-1 lg:gap-2 justify-end">
+            {/* Status e Saldo - Sempre visível e compacto */}
+            <div className="bg-green-50 text-green-800 px-2 lg:px-3 py-1.5 rounded-lg flex items-center gap-2 lg:gap-3 font-bold text-[10px] lg:text-xs shadow-sm border border-green-200 shrink-0">
+                <div className="flex items-center gap-1 border-r border-green-200 pr-2 lg:pr-3">
+                    <Unlock size={12} className="text-green-600" />
+                    <span className="whitespace-nowrap"># {caixa.id}</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-black">
+                    <span className="text-green-600 text-xs lg:text-sm">R$ {parseFloat(String(caixa.saldo_atual || 0)).toFixed(2)}</span>
+                </div>
             </div>
 
             {isOwner && (
-                <button
-                    onClick={() => setIsCloseModalOpen(true)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-red-500/20"
-                >
-                    <Lock size={16} />
-                    FECHAR CAIXA
-                </button>
+                <div className="flex items-center gap-1 lg:gap-2">
+                    <button
+                        onClick={() => setIsSuprimentoModalOpen(true)}
+                        title="Suprimento de Caixa"
+                        className="bg-blue-600 hover:bg-blue-700 text-white p-2 lg:px-3 lg:py-1.5 rounded-lg font-black text-[10px] lg:text-xs flex items-center gap-1 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                    >
+                        <ArrowUpCircle size={14} /> <span className="hidden sm:inline lg:inline">Suprimento</span>
+                    </button>
+                    <button
+                        onClick={() => setIsSangriaModalOpen(true)}
+                        title="Sangria de Caixa"
+                        className="bg-orange-600 hover:bg-orange-700 text-white p-2 lg:px-3 lg:py-1.5 rounded-lg font-black text-[10px] lg:text-xs flex items-center gap-1 transition-all active:scale-95 shadow-lg shadow-orange-500/20"
+                    >
+                        <ArrowDownCircle size={14} /> <span className="hidden sm:inline lg:inline">Sangria</span>
+                    </button>
+                    <button
+                        onClick={() => setIsCloseModalOpen(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white p-2 lg:px-3 lg:py-1.5 rounded-lg font-black text-[10px] lg:text-xs flex items-center gap-1 transition-all active:scale-95 shadow-lg shadow-red-500/20"
+                        title="Fechar Caixa"
+                    >
+                        <Lock size={14} /> <span className="hidden sm:inline lg:inline">FECHAR</span>
+                    </button>
+                </div>
             )}
 
             {isCloseModalOpen && (
@@ -156,6 +199,78 @@ export const ShiftManager = () => {
                                 className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSubmitting ? 'Fechando...' : 'CONFIRMAR FECHAMENTO'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Sangria Modal */}
+            {isSangriaModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-up relative">
+                        <button onClick={() => setIsSangriaModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <X size={24} />
+                        </button>
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-orange-600">
+                                <ArrowDownCircle size={32} />
+                            </div>
+                            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Sangria</h2>
+                            <p className="text-gray-500 mt-2">Retirada de dinheiro do caixa (ex: pagamento de conta, vale).</p>
+                            <div className="mt-4 bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Saldo Atual em Dinheiro</p>
+                                <p className="text-xl font-black text-orange-600">R$ {parseFloat(String(caixa.saldo_atual || 0)).toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Valor da Retirada (R$)</label>
+                                <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="w-full text-3xl font-black text-center border-b-2 border-gray-200 focus:border-primary outline-none py-2 bg-transparent" placeholder="0,00" autoFocus required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Descrição / Motivo</label>
+                                <input type="text" value={movDescricao} onChange={e => setMovDescricao(e.target.value)} className="w-full text-lg border-b-2 border-gray-200 focus:border-primary outline-none py-2 bg-transparent" placeholder="Ex: Pagamento Fornecedor" required />
+                            </div>
+                            {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 p-2 rounded">{error}</div>}
+                            <button disabled={isSubmitting || !amount || !movDescricao} className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? 'Registrando...' : 'REGISTRAR SANGRIA'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Suprimento Modal */}
+            {isSuprimentoModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-up relative">
+                        <button onClick={() => setIsSuprimentoModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <X size={24} />
+                        </button>
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600">
+                                <ArrowUpCircle size={32} />
+                            </div>
+                            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Suprimento</h2>
+                            <p className="text-gray-500 mt-2">Entrada de dinheiro extra no caixa (ex: reforço de troco).</p>
+                            <div className="mt-4 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Saldo Atual em Dinheiro</p>
+                                <p className="text-xl font-black text-blue-600">R$ {parseFloat(String(caixa.saldo_atual || 0)).toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Valor da Entrada (R$)</label>
+                                <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="w-full text-3xl font-black text-center border-b-2 border-gray-200 focus:border-primary outline-none py-2 bg-transparent" placeholder="0,00" autoFocus required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Descrição / Motivo</label>
+                                <input type="text" value={movDescricao} onChange={e => setMovDescricao(e.target.value)} className="w-full text-lg border-b-2 border-gray-200 focus:border-primary outline-none py-2 bg-transparent" placeholder="Ex: Reforço de Troco" required />
+                            </div>
+                            {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 p-2 rounded">{error}</div>}
+                            <button disabled={isSubmitting || !amount || !movDescricao} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? 'Registrando...' : 'REGISTRAR SUPRIMENTO'}
                             </button>
                         </form>
                     </div>

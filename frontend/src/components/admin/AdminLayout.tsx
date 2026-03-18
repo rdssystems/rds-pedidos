@@ -16,7 +16,10 @@ import {
     LayoutGrid,
     PanelLeftClose,
     PanelLeftOpen,
-    AlertTriangle
+    AlertTriangle,
+    Menu,
+    X,
+    Bot
 } from 'lucide-react';
 
 
@@ -31,7 +34,13 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     const pathname = usePathname();
     const router = useRouter();
     const [isMinimized, setIsMinimized] = React.useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [closingAlert, setClosingAlert] = React.useState<string | null>(null);
+
+    // Close mobile menu on navigation
+    React.useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [pathname]);
 
     // Get all unique roles user has across all stores (simplified for now)
     const [userRoles, setUserRoles] = React.useState<string[]>([]);
@@ -94,14 +103,13 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     }
 
     const menuItems = [
-        { label: 'Resumo', icon: LayoutDashboard, href: '/dashboard', roles: ['owner', 'manager'] },
-        { label: 'Atendimento', icon: LayoutGrid, href: '/mesas', roles: ['owner', 'manager', 'waiter'], plan: ['PRO'] },
-        { label: 'Pedidos', icon: ShoppingBag, href: '/orders', roles: ['owner', 'manager', 'waiter', 'kitchen', 'driver', 'cashier'] },
-        { label: 'Caixa (PDV)', icon: CreditCard, href: '/pos', roles: ['owner', 'manager', 'cashier'], plan: ['Basic', 'PRO'] },
+        { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['owner', 'manager'] },
+        { label: 'Mesas', icon: LayoutGrid, href: '/mesas', roles: ['owner', 'manager', 'waiter'], plan: ['PRO', 'ELITE'] },
+        { label: 'Pedidos', icon: ShoppingBag, href: '/orders', roles: ['owner', 'manager', 'waiter', 'kitchen', 'driver', 'cashier'], plan: ['PRO', 'ELITE'] },
+        { label: 'Caixa', icon: CreditCard, href: '/pos', roles: ['owner', 'manager', 'cashier'], plan: ['START', 'PRO', 'ELITE'] },
         { label: 'Cardápio', icon: UtensilsCrossed, href: '/menu', roles: ['owner', 'manager'] },
-        { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'], plan: ['PRO'] },
-        { label: 'WhatsApp', icon: MessageSquare, href: '/settings/whatsapp', roles: ['owner', 'manager'], plan: ['PRO'] },
-        { label: 'iFood', icon: ShoppingBag, href: '/settings/ifood', roles: ['owner', 'manager'], plan: ['PRO'] },
+        { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'], plan: ['PRO', 'ELITE'] },
+        { label: 'Integrações', icon: MessageSquare, href: '/integrations', roles: ['owner', 'manager'], plan: ['PRO', 'ELITE'] },
         { label: 'Assinatura', icon: CreditCard, href: '/settings/billing', roles: ['owner'] },
         { label: 'Configurações', icon: Settings, href: '/settings', roles: ['owner', 'manager'] },
     ];
@@ -117,7 +125,6 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         return 'Membro';
     };
 
-    const currentPlan = store?.plano_details?.nome;
     const isSubscriptionActive = store?.status_assinatura === 'active' || store?.status_assinatura === 'trial';
 
     const filteredMenuItems = menuItems.filter(item => {
@@ -127,7 +134,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
         // 2. Check Plan Requirements
         // Give trial accounts access to all plan features to let them evaluate the full platform
-        if (item.plan && !item.plan.includes(currentPlan as any) && store?.status_assinatura !== 'trial') {
+        if (item.plan && !item.plan.includes(store?.plano_tipo as any) && store?.status_assinatura !== 'trial') {
             return false;
         }
 
@@ -168,10 +175,16 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             {/* Mobile Header */}
             <div className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 z-50">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="mr-1 p-1 text-gray-500 hover:text-primary transition-colors"
+                    >
+                        <Menu size={24} />
+                    </button>
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0">
                         <ChefHat size={18} />
                     </div>
-                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase">{store?.nome || 'Admin'}</h1>
+                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase truncate max-w-[150px]">{store?.nome || 'Admin'}</h1>
                 </div>
                 <button
                     onClick={logout}
@@ -181,8 +194,31 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 </button>
             </div>
 
+            {/* Mobile Overlay */}
+            {isMobileMenuOpen && (
+                <div
+                    className="md:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[55] transition-opacity"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className={`${isMinimized ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 hidden md:flex flex-col sticky top-0 h-screen transition-all duration-300 ease-in-out`}>
+            <aside className={`
+                ${isMinimized ? 'md:w-20' : 'md:w-64'} 
+                bg-white border-r border-gray-200 
+                fixed md:sticky top-0 h-screen z-[60]
+                transition-all duration-300 ease-in-out md:translate-x-0
+                ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full w-64 md:w-auto'}
+                flex flex-col 
+            `}>
+                {/* Mobile Close Button inside sidebar */}
+                <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="md:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 bg-gray-50 rounded-full"
+                >
+                    <X size={20} />
+                </button>
+
                 <div className={`p-6 ${isMinimized ? 'px-4' : 'pb-4 p-8'}`}>
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
@@ -201,8 +237,8 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                     </div>
                 </div>
 
-                {/* Toggle Button */}
-                <div className="px-4 py-2 border-y border-gray-50 bg-gray-50/30 flex justify-center">
+                {/* Toggle Button (Desktop Only) */}
+                <div className="hidden md:flex px-4 py-2 border-y border-gray-50 bg-gray-50/30 justify-center">
                     <button
                         onClick={() => setIsMinimized(!isMinimized)}
                         className="p-2 text-gray-400 hover:text-primary hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-100"
@@ -214,7 +250,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
                 <nav className="flex-1 px-4 space-y-1">
                     {filteredMenuItems.map((item) => {
-                        const isActive = pathname === item.href;
+                        const isActive = pathname === item.href || (item.href === '/integrations' && pathname.startsWith('/integrations'));
                         return (
                             <Link
                                 key={item.href}
@@ -277,8 +313,8 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</span>
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${store.status_assinatura === 'trial' ? 'bg-orange-100 text-orange-600' :
-                                                        store.status_assinatura === 'active' ? 'bg-green-100 text-green-600' :
-                                                            'bg-red-100 text-red-600'
+                                                    store.status_assinatura === 'active' ? 'bg-green-100 text-green-600' :
+                                                        'bg-red-100 text-red-600'
                                                     }`}>
                                                     {statusLabel}
                                                 </span>

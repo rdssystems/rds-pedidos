@@ -27,6 +27,7 @@ from rest_framework.exceptions import PermissionDenied
 from .services import EvolutionService
 from .ifood_service import IFoodService
 from .mercadopago_service import MercadoPagoService
+from .ai_service import GeminiService
 import json
 import uuid
 
@@ -64,6 +65,9 @@ class RegisterView(viewsets.ViewSet):
         try:
             with transaction.atomic():
                 user = User.objects.create_user(username=email, email=email, password=password, first_name=responsible_name)
+                user.is_active = False # Bloqueia o login até confirmar o email
+                user.save()
+                
                 base_slug = slugify(store_name)
                 slug = base_slug
                 counter = 1
@@ -85,12 +89,14 @@ class RegisterView(viewsets.ViewSet):
                 subject = "Bem-vindo ao RDS Pedidos - Verifique seu E-mail"
                 message = f"Olá {user.first_name or user.username},\n\nObrigado por se cadastrar! Sua loja '{store.nome}' foi criada com sucesso.\n\nPor favor, confirme seu e-mail clicando no link abaixo:\n\n{verify_url}"
                 
+                logger.info(f"[CADASTRO] Link de verificação para {email}: {verify_url}")
+                
                 try:
                     send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
                 except Exception as e:
                     logger.error(f"Erro ao enviar e-mail de boas-vindas: {e}")
 
-                return Response({"message": "Conta e loja criadas com sucesso! Verifique seu e-mail para ativar sua conta.", "store_slug": store.slug, "username": user.username}, status=status.HTTP_201_CREATED)
+                return Response({"message": "Conta criada com sucesso! Verifique seu e-mail para ativar sua conta e acessar o sistema.", "store_slug": store.slug, "username": user.username}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -124,9 +130,12 @@ class UserViewSet(viewsets.ViewSet):
             subject = "Recuperação de Senha - RDS Pedidos"
             message = f"Olá {user.first_name or user.username},\n\nRecebemos uma solicitação para redefinir sua senha. Clique no link abaixo para prosseguir:\n\n{reset_url}\n\nSe você não solicitou isso, ignore este e-mail."
             
+            logger.info(f"[SENHA] Link de recuperação para {email}: {reset_url}")
+            
             try:
                 send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
             except Exception as e:
+                logger.error(f"Erro ao enviar e-mail de recuperação: {e}")
                 return Response({"error": f"Erro ao enviar e-mail: {str(e)}"}, status=500)
                 
         # Always return success to prevent email enumeration
@@ -188,7 +197,13 @@ class UserViewSet(viewsets.ViewSet):
             profile.is_verified = True
             profile.verification_token = None
             profile.save()
-            return Response({"message": "E-mail verificado com sucesso!"})
+            
+            # Ativa o usuário para permitir o login
+            user = profile.user
+            user.is_active = True
+            user.save()
+            
+            return Response({"message": "E-mail verificado com sucesso! Você já pode fazer login."})
         else:
             return Response({"error": "Token inválido."}, status=400)
 
@@ -216,15 +231,40 @@ class StoreViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='whatsapp-status')
     def whatsapp_status(self, request, slug=None):
         store = self.get_object()
-        if not store.evolution_instance: return Response({"status": "disconnected"})
+        if not store.evolution_instance: 
+            return Response({"status": "disconnected"})
+        
         service = EvolutionService()
         try:
+            logger.info(f"Checking WhatsApp status for store {store.slug} (instance: {store.evolution_instance})")
             res = service.get_status(store.evolution_instance)
-            state = res.get('instance', {}).get('state')
-            if state == 'open': return Response({"status": "connected"})
+            
+            # The response might be nested or direct depending on the Evolution API version
+            instance_data = res.get('instance', res)
+            state = instance_data.get('state') or res.get('status')
+            
+            if state == 'open': 
+                return Response({"status": "connected"})
+            
+            # If not open, try to get QR Code
+            logger.info(f"Instance {store.evolution_instance} not open (state: {state}). Fetching QR code...")
             qr_res = service.get_qr_code(store.evolution_instance)
-            return Response({"status": "connecting", "qrCode": qr_res.get('base64')})
-        except Exception as e: return Response({"status": "disconnected", "error": str(e)})
+            
+            # Evolution API v1 returns 'base64' at top level
+            # Some versions might return it inside a 'qrcode' object or different field
+            qr_base64 = qr_res.get('base64') or qr_res.get('qrcode', {}).get('base64')
+            
+            if not qr_base64:
+                logger.warning(f"QR Code response for {store.evolution_instance} missing base64: {qr_res}")
+                
+            return Response({
+                "status": "connecting", 
+                "qrCode": qr_base64,
+                "details": qr_res if not qr_base64 else None
+            })
+        except Exception as e: 
+            logger.error(f"Error in whatsapp_status for {store.slug}: {str(e)}", exc_info=True)
+            return Response({"status": "disconnected", "error": str(e)})
 
     @action(detail=True, methods=['post'], url_path='whatsapp-connect')
     def whatsapp_connect(self, request, slug=None):
@@ -232,12 +272,36 @@ class StoreViewSet(viewsets.ModelViewSet):
         service = EvolutionService()
         instance_name = store.slug
         try:
-            service.create_instance(instance_name)
+            logger.info(f"Connecting WhatsApp for store {store.slug}")
+            create_res = service.create_instance(instance_name)
+            
+            # Check if creation returned an error but we should continue anyway (e.g. 403 already exists)
+            # In Evolution API, create returns 201 or 403
+            
             store.evolution_instance = instance_name
             store.save()
+            
+            # Set Webhook for messages
+            webhook_res = service.set_webhook(instance_name)
+            logger.info(f"Webhook set result: {webhook_res}")
+            
+            # Give it a tiny bit of time or just try to get the QR
             qr_res = service.get_qr_code(instance_name)
-            return Response({"status": "connecting", "qrCode": qr_res.get('base64')})
-        except Exception as e: return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            qr_base64 = qr_res.get('base64') or qr_res.get('qrcode', {}).get('base64')
+            
+            if not qr_base64:
+                # Some versions return the QR code directly in the create response
+                qr_base64 = create_res.get('qrcode', {}).get('base64') or create_res.get('base64')
+
+            logger.info(f"WhatsApp connect initiated for {store.slug}. QR found: {bool(qr_base64)}")
+            
+            return Response({
+                "status": "connecting", 
+                "qrCode": qr_base64
+            })
+        except Exception as e: 
+            logger.error(f"Error in whatsapp_connect for {store.slug}: {str(e)}", exc_info=True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'], url_path='whatsapp-disconnect')
     def whatsapp_disconnect(self, request, slug=None):
@@ -407,6 +471,31 @@ class StoreViewSet(viewsets.ModelViewSet):
         except Plano.DoesNotExist:
             return Response({"error": "Plano não encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
+    @action(detail=True, methods=['get'], url_path='gerar-qr-codes')
+    def gerar_qr_codes(self, request, slug=None):
+        store = self.get_object()
+        if not store.quantidade_mesas:
+            return Response({"error": "Quantidade de mesas não configurada."}, status=400)
+        
+        # Determine the base URL for the menu
+        # frontend_url = settings.FRONTEND_URL
+        # In a real scenario, this would be the store's public menu URL
+        # For now, we use the slug based approach
+        base_url = f"{settings.FRONTEND_URL}/{store.slug}"
+        
+        qrs = []
+        for i in range(1, store.quantidade_mesas + 1):
+            qrs.append({
+                "mesa": i,
+                "url": f"{base_url}?mesa={i}"
+            })
+            
+        return Response({
+            "store_name": store.nome,
+            "base_url": base_url,
+            "qrs": qrs
+        })
+
     def update(self, request, *args, **kwargs):
         with open('debug_frontend_payload.txt', 'w') as f:
             f.write(str(dict(request.data)))
@@ -429,6 +518,27 @@ class StoreViewSet(viewsets.ModelViewSet):
             f.write("\nValid super: " + str(serializer.validated_data))
         return super().update(request, *args, **kwargs)
 
+    @action(detail=True, methods=['post'], url_path='especialista-financeiro')
+    def especialista_financeiro(self, request, slug=None):
+        loja = self.get_object()
+        
+        # Restriction: PRO/ELITE
+        if loja.plano_tipo not in ['PRO', 'ELITE']:
+            return Response({
+                'error': 'Especialista em Finanças está disponível apenas nos planos PRO e ELITE.',
+                'upgrade_required': True
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        query = request.data.get('query')
+        if not query:
+            return Response({'error': 'Por favor, envie sua dúvida.'}, status=400)
+        
+        ai_service = GeminiService()
+        owner_name = request.user.first_name or request.user.username
+        ai_response = ai_service.chat_specialist(loja, query, owner_name)
+        
+        return Response({'response': ai_response})
+
 class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -437,53 +547,122 @@ class DashboardStatsView(APIView):
         if not loja:
             return Response({"error": "Loja não encontrada"}, status=404)
 
-        now = timezone.now()
-        # Adjusted for BR timezone (UTC-3)
-        br_now = now - timedelta(hours=3)
-        today_weekday = br_now.strftime('%a').lower()[:3]
-        
-        weekday_map = {
-            'mon': 'seg', 'tue': 'ter', 'wed': 'qua', 'thu': 'qui', 
-            'fri': 'sex', 'sat': 'sab', 'sun': 'dom'
-        }
-        today_key = weekday_map.get(today_weekday, 'seg')
-        
-        horario = loja.horario_funcionamento or {}
-        dia_config = horario.get(today_key, {})
-        
-        reset_time_hour = 4
-        reset_time_minute = 0
-        
-        if isinstance(dia_config, dict) and not dia_config.get('closed') and dia_config.get('open'):
-            try:
-                open_h, open_m = map(int, dia_config.get('open').split(':'))
-                reset_time_hour = open_h - 3
-                reset_time_minute = open_m
-                if reset_time_hour < 0: reset_time_hour += 24
-            except: pass
+        from django.utils.dateparse import parse_datetime
+        start_date_param = request.query_params.get('start_date')
+        end_date_param = request.query_params.get('end_date')
 
-        current_reset_today = br_now.replace(hour=max(0, min(23, reset_time_hour)), minute=reset_time_minute, second=0, microsecond=0)
-        
-        if br_now < current_reset_today:
-            start_date_br = current_reset_today - timedelta(days=1)
+        if start_date_param:
+            start_date_utc = parse_datetime(start_date_param)
         else:
-            start_date_br = current_reset_today
+            now = timezone.now()
+            # Adjusted for BR timezone (UTC-3)
+            br_now = now - timedelta(hours=3)
+            today_weekday = br_now.strftime('%a').lower()[:3]
+            
+            weekday_map = {
+                'mon': 'seg', 'tue': 'ter', 'wed': 'qua', 'thu': 'qui', 
+                'fri': 'sex', 'sat': 'sab', 'sun': 'dom'
+            }
+            today_key = weekday_map.get(today_weekday, 'seg')
+            
+            horario = loja.horario_funcionamento or {}
+            dia_config = horario.get(today_key, {})
+            
+            reset_time_hour = 5 # Padrão: Reinicia às 5 da manhã se não houver config
+            reset_time_minute = 0
+            
+            if isinstance(dia_config, dict) and not dia_config.get('closed') and dia_config.get('open'):
+                try:
+                    open_h, open_m = map(int, dia_config.get('open').split(':'))
+                    reset_time_hour = open_h - 2 # Reinicia 2 horas antes de abrir
+                    reset_time_minute = open_m
+                    if reset_time_hour < 0: reset_time_hour += 24
+                except: pass
 
-        start_date_utc = start_date_br + timedelta(hours=3)
+            current_reset_today = br_now.replace(hour=max(0, min(23, reset_time_hour)), minute=reset_time_minute, second=0, microsecond=0)
+            
+            if br_now < current_reset_today:
+                start_date_br = current_reset_today - timedelta(days=1)
+            else:
+                start_date_br = current_reset_today
 
-        pedidos_hoje = Pedido.objects.filter(loja=loja, criado_em__gte=start_date_utc)
+            start_date_utc = start_date_br + timedelta(hours=3)
+
+        end_date_utc = parse_datetime(end_date_param) if end_date_param else timezone.now()
+
+        pedidos_periodo = Pedido.objects.filter(loja=loja, criado_em__gte=start_date_utc, criado_em__lte=end_date_utc)
         
-        finalizados = pedidos_hoje.filter(status='FINALIZADO')
+        finalizados = pedidos_periodo.filter(status='FINALIZADO')
         faturamento = finalizados.aggregate(total=Sum('total'))['total'] or 0
         concluidos_count = finalizados.count()
-        total_count = pedidos_hoje.count()
+        total_count = pedidos_periodo.count()
         ticket_medio = float(faturamento) / concluidos_count if concluidos_count > 0 else 0
         
-        em_preparo = pedidos_hoje.filter(status__in=['PREPARO', 'PRONTO']).count()
-        novos = pedidos_hoje.filter(status='NOVO').count()
+        em_preparo = pedidos_periodo.filter(status__in=['PREPARO', 'PRONTO']).count()
+        novos = pedidos_periodo.filter(status='NOVO').count()
         
-        historico = pedidos_hoje.order_by('-criado_em')[:10]
+        historico = pedidos_periodo.order_by('-criado_em')[:20]
         
+        # Revenue Chart Data (Last 24h or Current Day)
+        from django.db.models.functions import TruncHour
+        chart_data = pedidos_periodo.filter(status='FINALIZADO')\
+            .annotate(hour=TruncHour('criado_em'))\
+            .values('hour')\
+            .annotate(total=Sum('total'))\
+            .order_by('hour')
+        
+        formatted_chart = [
+            {"hour": item['hour'].strftime('%H:00'), "total": float(item['total'])} 
+            for item in chart_data
+        ]
+
+        # Top Products
+        from .models import ItemPedido
+        
+        categoria_id = request.query_params.get('categoria_id')
+        top_products_qs = ItemPedido.objects.filter(pedido__in=pedidos_periodo)
+        
+        if categoria_id and categoria_id != 'all':
+            try:
+                top_products_qs = top_products_qs.filter(produto__categoria_id=int(categoria_id))
+            except ValueError:
+                pass
+                
+        top_products = top_products_qs.values('produto__nome')\
+            .annotate(total_qty=Sum('quantidade'))\
+            .order_by('-total_qty')[:5]
+        
+        formatted_top = [
+            {"name": item['produto__nome'], "qty": item['total_qty']}
+            for item in top_products
+        ]
+
+        # Active Orders & Tables
+        active_orders_count = Pedido.objects.filter(loja=loja, status__in=['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO']).count()
+        occupied_tables_count = Pedido.objects.filter(loja=loja, tipo='MESA', status__in=['NOVO', 'PREPARO', 'PRONTO']).count()
+
+        # Cash Register (Caixa) Status
+        from .models import Caixa
+        open_shift = Caixa.objects.filter(loja=loja, status='ABERTO').last()
+        saldo_caixa = 0
+        if open_shift:
+            total_entradas = open_shift.movimentacoes.filter(tipo__in=['ABERTURA', 'VENDA', 'SUPRIMENTO']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+            total_saidas = open_shift.movimentacoes.filter(tipo__in=['SANGRIA']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+            saldo_caixa = float(total_entradas - total_saidas)
+
+        # System Notifications
+        from .models import NotificacaoSistema
+        recent_notifications = NotificacaoSistema.objects.filter(loja=loja).order_by('-criado_em')[:5]
+        formatted_notifications = [
+            {
+                "id": notif.id,
+                "titulo": notif.titulo,
+                "mensagem": notif.mensagem,
+                "lida": notif.lida,
+                "criado_em": notif.criado_em.isoformat()
+            } for notif in recent_notifications
+        ]
+
         return Response({
             "stats": {
                 "faturamento": float(faturamento),
@@ -491,9 +670,15 @@ class DashboardStatsView(APIView):
                 "total_pedidos": total_count,
                 "ticket_medio": ticket_medio,
                 "em_preparo": em_preparo,
-                "novos_hoje": novos
+                "novos_hoje": novos,
+                "pedidos_ativos": active_orders_count,
+                "mesas_ocupadas": occupied_tables_count,
+                "saldo_caixa": saldo_caixa
             },
-            "recent_orders": PedidoSerializer(historico, many=True).data
+            "chart_data": formatted_chart,
+            "top_products": formatted_top,
+            "recent_orders": PedidoSerializer(historico, many=True).data,
+            "notificacoes": formatted_notifications
         })
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -593,7 +778,11 @@ class PedidoViewSet(viewsets.ModelViewSet):
             
         mesa = self.request.query_params.get('mesa')
         if mesa:
-            queryset = queryset.filter(mesa=mesa)
+            if str(mesa).startswith('B-'):
+                pedido_id = str(mesa).split('-')[1]
+                queryset = queryset.filter(id=pedido_id)
+            else:
+                queryset = queryset.filter(mesa=mesa)
             
         return queryset
 
@@ -620,21 +809,30 @@ class PedidoViewSet(viewsets.ModelViewSet):
         # Filter active mesa orders for this store
         orders = Pedido.objects.filter(
             loja_id=loja_id, 
-            tipo='MESA',
-            mesa__isnull=False
+            tipo__in=['MESA', 'BALCAO']
         ).exclude(status__in=['FINALIZADO', 'CANCELADO'])
         
         # Group by mesa and get total/items
         mesas_data = {}
         for order in orders:
-            m = order.mesa
+            if order.tipo == 'MESA' and not order.mesa:
+                continue
+
+            if order.tipo == 'BALCAO':
+                m = f"B-{order.id}"
+                label = f"B-{order.id}"
+            else:
+                m = str(order.mesa)
+                label = str(order.mesa)
+
             if m not in mesas_data:
                 mesas_data[m] = {
                     'mesa': m,
+                    'label': label,
                     'pedidos_ids': [],
                     'total': 0,
                     'itens_count': 0,
-                    'status': 'OCUPADA',
+                    'status': order.status if order.tipo == 'BALCAO' else 'OCUPADA',
                     'cliente_nome': order.cliente_nome # Takes last one or representative
                 }
             mesas_data[m]['pedidos_ids'].append(order.id)
@@ -733,7 +931,28 @@ class CaixaViewSet(viewsets.ModelViewSet):
             descricao=f'Fechamento de Caixa (Esperado: {caixa.saldo_final_esperado})'
         )
 
-        return Response(CaixaSerializer(caixa).data)
+        # Gemini AI Financial Report (PRO/ELITE)
+        relatorio_ia = None
+        if caixa.loja.plano_tipo in ['PRO', 'ELITE']:
+            try:
+                ai_service = GeminiService()
+                relatorio_ia = ai_service.get_financial_report(caixa.id)
+                
+                # Send to WhatsApp if configured
+                if caixa.loja.evolution_instance and caixa.loja.whatsapp:
+                    wa_service = EvolutionService()
+                    wa_service.send_message(
+                        caixa.loja.evolution_instance, 
+                        caixa.loja.whatsapp, 
+                        f"*Especialista em Finanças RDS*\n\n{relatorio_ia}"
+                    )
+            except Exception as e:
+                logger.error(f"Erro ao gerar relatório IA: {e}")
+
+        return Response({
+            'caixa': CaixaSerializer(caixa).data,
+            'relatorio_ia': relatorio_ia
+        })
 
     @action(detail=False, methods=['post'])
     def venda(self, request):
@@ -843,9 +1062,21 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 loja = ConfiguracaoLoja.objects.get(id=loja_id)
+                
                 # Permission check: Only owner or manager (can be refined) can add members
                 if loja.owner != request.user and not PerfilUsuarioLoja.objects.filter(loja=loja, user=request.user, role='manager').exists():
                     return Response({"error": "Somente o proprietário ou gerente pode adicionar membros"}, status=status.HTTP_403_FORBIDDEN)
+
+                # Plan-based member limits
+                current_members = PerfilUsuarioLoja.objects.filter(loja=loja).count()
+                
+                # START plan: Only 1 member (usually the owner)
+                if loja.plano_tipo == 'START' and current_members >= 1:
+                    return Response({"error": "O plano Start permite apenas 1 usuário de equipe (o proprietário). Faça upgrade para o plano Pro para adicionar atendentes."}, status=status.HTTP_403_FORBIDDEN)
+                
+                # PRO plan: Max 3 members
+                if loja.plano_tipo == 'PRO' and current_members >= 3:
+                    return Response({"error": "O plano Pro permite até 3 usuários de equipe. Para adicionar mais membros, mude para o plano Elite."}, status=status.HTTP_403_FORBIDDEN)
 
                 # Get or Create User
                 user_to_add = User.objects.filter(Q(username=email) | Q(email=email)).first()
@@ -881,3 +1112,28 @@ class MercadoPagoWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
     def post(self, request):
         return Response(status=200)
+
+class WebhookEvolutionView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Recebe webhooks da Evolution API.
+        A URL esperada deve ser algo como: /api/evolution/webhook/<nome_instancia>/
+        """
+        instancia = kwargs.get('instancia')
+        payload = request.data
+        
+        if not instancia:
+            return Response({"status": "error", "message": "Instância não informada"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .bot.evolution_webhook_service import EvolutionWebhookService
+        
+        import threading
+        def bg_task(inst, payld):
+            EvolutionWebhookService.processar_webhook(inst, payld)
+            
+        thread = threading.Thread(target=bg_task, args=(instancia, payload))
+        thread.start()
+
+        return Response({"status": "received"}, status=status.HTTP_200_OK)

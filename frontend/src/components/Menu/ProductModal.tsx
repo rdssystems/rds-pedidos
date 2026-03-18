@@ -33,9 +33,10 @@ interface ProductModalProps {
     product: Produto;
     onAddToCart: (item: any) => void;
     storeColor?: string;
+    modoCatalogo?: boolean;
 }
 
-export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor = '#000' }: ProductModalProps) => {
+export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor = '#000', modoCatalogo = false }: ProductModalProps) => {
     const [quantity, setQuantity] = useState(1);
     const [selections, setSelections] = useState<Record<number, number[]>>({}); // grupoId -> [opcaoId, opcaoId]
     const [totalPrice, setTotalPrice] = useState(0);
@@ -249,21 +250,27 @@ export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor
                 {/* Footer Action */}
                 <div className="p-6 bg-white border-t border-gray-100 shrink-0">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4 bg-gray-100 rounded-2xl p-1">
-                            <button
-                                onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-gray-900 hover:text-primary transition-colors active:scale-95"
-                            >
-                                <Minus size={18} />
-                            </button>
-                            <span className="font-black text-xl w-6 text-center">{quantity}</span>
-                            <button
-                                onClick={() => setQuantity(q => q + 1)}
-                                className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-gray-900 hover:text-primary transition-colors active:scale-95"
-                            >
-                                <Plus size={18} />
-                            </button>
-                        </div>
+                        {!modoCatalogo ? (
+                            <div className="flex items-center gap-4 bg-gray-100 rounded-2xl p-1">
+                                <button
+                                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                                    className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-gray-900 hover:text-primary transition-colors active:scale-95"
+                                >
+                                    <Minus size={18} />
+                                </button>
+                                <span className="font-black text-xl w-6 text-center">{quantity}</span>
+                                <button
+                                    onClick={() => setQuantity(q => q + 1)}
+                                    className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-gray-900 hover:text-primary transition-colors active:scale-95"
+                                >
+                                    <Plus size={18} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-gray-400 font-bold uppercase text-[10px] tracking-widest bg-gray-50 px-4 py-2 rounded-xl border border-dashed border-gray-200">
+                                Visualização apenas
+                            </div>
+                        )}
                         <div className="text-right">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total do Item</p>
                             <p className="text-2xl font-black italic tracking-tighter" style={{ color: storeColor }}>
@@ -272,16 +279,25 @@ export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleConfirm}
-                        className="w-full py-5 text-white rounded-[2rem] font-black text-xl uppercase italic tracking-tighter shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
-                        style={{ backgroundColor: storeColor }}
-                    >
-                        <span>Adicionar à Sacola</span>
-                        <div className="bg-white/20 p-1.5 rounded-full">
-                            <Plus size={16} />
-                        </div>
-                    </button>
+                    {!modoCatalogo ? (
+                        <button
+                            onClick={handleConfirm}
+                            className="w-full py-5 text-white rounded-[2rem] font-black text-xl uppercase italic tracking-tighter shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            style={{ backgroundColor: storeColor }}
+                        >
+                            <span>Adicionar à Sacola</span>
+                            <div className="bg-white/20 p-1.5 rounded-full">
+                                <Plus size={16} />
+                            </div>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={onClose}
+                            className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black text-xl uppercase italic tracking-tighter shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                            <span>Fechar Detalhes</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

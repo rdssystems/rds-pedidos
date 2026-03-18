@@ -39,7 +39,10 @@ const ROLE_OPTIONS = [
     { value: 'driver', label: 'Entregador', icon: Truck, color: 'text-green-500', bg: 'bg-green-100' },
 ];
 
+import { useBilling } from '@/context/BillingContext';
+
 export default function TeamPage() {
+    const { store } = useBilling();
     const [team, setTeam] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddingMode, setIsAddingMode] = useState(false);
@@ -54,6 +57,10 @@ export default function TeamPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+
+    const isPlanStart = store?.plano_tipo === 'START';
+    const isPlanPro = store?.plano_tipo === 'PRO';
+    const canAddMore = !isPlanStart && !(isPlanPro && team.length >= 3);
 
     const fetchTeam = async () => {
         try {
@@ -85,7 +92,7 @@ export default function TeamPage() {
 
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!storeId) return;
+        if (!storeId || !canAddMore) return;
 
         if (newMemberPassword !== newMemberConfirmPassword) {
             setError('As senhas não coincidem.');
@@ -137,7 +144,7 @@ export default function TeamPage() {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`/api/equipe/${id}//`, {
+            const res = await fetch(`/api/equipe/${id}/`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -160,17 +167,31 @@ export default function TeamPage() {
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-10">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
+                <div className="flex-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest italic mb-2 border border-gray-200">
+                        {isPlanStart ? 'Plano Start' : isPlanPro ? `Plano Pro (${team.length}/3)` : 'Plano Elite'}
+                    </div>
                     <h1 className="text-3xl font-black text-gray-900 italic uppercase tracking-tighter">Equipe e Permissões</h1>
                     <p className="text-gray-500 mt-1">Gerencie quem tem acesso à sua loja e quais seus papéis.</p>
                 </div>
-                <button
-                    onClick={() => setIsAddingMode(true)}
-                    className="bg-primary text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
-                >
-                    <UserPlus size={20} />
-                    <span>Novo Membro</span>
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                    <button
+                        onClick={() => setIsAddingMode(true)}
+                        disabled={!canAddMore}
+                        className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-2 ${canAddMore
+                                ? 'bg-primary text-white shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5'
+                                : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                            }`}
+                    >
+                        <UserPlus size={20} />
+                        <span>Novo Membro</span>
+                    </button>
+                    {!canAddMore && (
+                        <p className="text-[10px] font-black text-orange-500 uppercase italic">
+                            {isPlanStart ? 'Upgrade para o PRO p/ adicionar equipe' : 'Limite de 3 membros atingido no plano PRO'}
+                        </p>
+                    )}
+                </div>
             </header>
 
             {success && (

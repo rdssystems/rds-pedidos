@@ -6,22 +6,24 @@ import { useRouter } from 'next/navigation';
 import { LayoutGrid, Loader2, Plus, Users, Receipt, Clock } from 'lucide-react';
 
 import { useSocket } from '@/context/SocketContext';
+import { useBilling } from '@/context/BillingContext';
 
 const TablesPage = () => {
-    const { user, loading } = useAuth();
+    const { user, loading: authLoading } = useAuth();
+    const { store, loading: billingLoading } = useBilling();
     const router = useRouter();
     const { lastMessage } = useSocket();
     const [mesas, setMesas] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedMesa, setSelectedMesa] = useState<number | null>(null);
 
-    const totalTables = 20; // Default number of tables
+    const totalTables = store?.quantidade_mesas || 0;
 
     useEffect(() => {
-        if (!loading && !user) {
+        if (!authLoading && !user) {
             router.push('/login');
         }
-    }, [user, loading, router]);
+    }, [user, authLoading, router]);
 
     const fetchMesas = async () => {
         setIsLoading(true);
@@ -66,7 +68,7 @@ const TablesPage = () => {
         }
     }, [lastMessage]);
 
-    if (loading || (isLoading && mesas.length === 0)) {
+    if (authLoading || billingLoading || (isLoading && mesas.length === 0)) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="flex flex-col items-center gap-4">
@@ -96,8 +98,8 @@ const TablesPage = () => {
                 </div>
             </header>
 
-            <main className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <main className="p-4 sm:p-6">
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2 sm:gap-4">
                     {Array.from({ length: totalTables }, (_, i) => i + 1).map(num => {
                         const status = getMesaStatus(num);
                         const isOccupied = !!status;
@@ -106,24 +108,24 @@ const TablesPage = () => {
                             <button
                                 key={num}
                                 onClick={() => router.push(`/mesas/${num}`)}
-                                className={`relative aspect-square rounded-2xl border-2 transition-all p-4 flex flex-col items-center justify-center gap-2 group ${isOccupied
+                                className={`relative aspect-square rounded-xl sm:rounded-2xl border-2 transition-all p-1 sm:p-4 flex flex-col items-center justify-center gap-0.5 sm:gap-2 group ${isOccupied
                                     ? 'bg-red-50 border-red-200 shadow-lg shadow-red-500/10'
                                     : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl'
                                     }`}
                             >
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-1 ${isOccupied ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors'
+                                <div className={`w-6 h-6 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-0 sm:mb-1 ${isOccupied ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors'
                                     }`}>
-                                    <span className="text-xl font-black">{num}</span>
+                                    <span className="text-xs sm:text-xl font-black">{num}</span>
                                 </div>
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${isOccupied ? 'text-red-600' : 'text-gray-300'
+                                <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-widest ${isOccupied ? 'text-red-600' : 'text-gray-300'
                                     }`}>
                                     {isOccupied ? 'Ocupada' : 'Livre'}
                                 </span>
 
                                 {isOccupied && (
-                                    <div className="mt-1 text-center">
-                                        <p className="text-sm font-black text-gray-800">R$ {status.total.toFixed(2)}</p>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase">{status.itens_count} itens</p>
+                                    <div className="mt-0 sm:mt-1 text-center leading-tight">
+                                        <p className="text-[8px] sm:text-sm font-black text-gray-800">R$ {status.total.toFixed(0)}</p>
+                                        <p className="text-[6px] sm:text-[9px] font-bold text-gray-400 uppercase">{status.itens_count} it</p>
                                     </div>
                                 )}
                             </button>

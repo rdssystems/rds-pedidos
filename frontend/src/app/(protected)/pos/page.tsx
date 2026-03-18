@@ -125,7 +125,7 @@ const PosContent = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     // Cliente Info
-    const [clienteNome, setClienteNome] = useState('Consumidor Final');
+    const [clienteNome, setClienteNome] = useState('');
     const [clienteWhatsapp, setClienteWhatsapp] = useState('');
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
@@ -145,6 +145,7 @@ const PosContent = () => {
     const [loadingMesas, setLoadingMesas] = useState(false);
 
     // Products are now fetched and managed by PosContext via WebSocket
+    const [isCartMobileOpen, setIsCartMobileOpen] = useState(false);
 
     const fetchMesas = async () => {
         setLoadingMesas(true);
@@ -178,7 +179,7 @@ const PosContent = () => {
             await checkout(paymentMethod, parseFloat(amountPaid) || total, { nome: clienteNome, whatsapp: clienteWhatsapp }, orderObservation);
             setIsCheckoutModalOpen(false);
             clearCart();
-            setClienteNome('Consumidor Final');
+            setClienteNome('');
             setClienteWhatsapp('');
             setOrderObservation('');
             alert('Venda realizada com sucesso!');
@@ -190,7 +191,7 @@ const PosContent = () => {
     const handleSendToKitchen = async () => {
         try {
             await sendToKitchen({ nome: clienteNome, whatsapp: clienteWhatsapp }, orderObservation);
-            setClienteNome('Consumidor Final');
+            setClienteNome('');
             setClienteWhatsapp('');
             setOrderObservation('');
             alert('Pedido realizado com sucesso!');
@@ -221,49 +222,50 @@ const PosContent = () => {
     const sortedCategories = Object.keys(groupedProducts).sort();
 
     return (
-        <div className="flex h-screen bg-gray-100 overflow-hidden relative">
-            {/* Shift Manager Overlay/Indicator */}
-            <div className="absolute top-4 right-4 z-50">
-                <ShiftManager />
-            </div>
-
+        <div className="flex flex-col lg:flex-row h-screen bg-gray-100 overflow-hidden relative">
             {/* Left Column: Product Grid */}
-            <div className="flex-1 flex flex-col border-r border-gray-200">
-                <header className="h-16 bg-white border-b flex items-center px-6 justify-between shrink-0">
-                    <div className="flex items-center gap-6">
-                        <h1 className="font-bold text-xl text-gray-800">Frente de Caixa</h1>
-                        <button
-                            onClick={() => { setIsTableModalOpen(true); fetchMesas(); }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-                        >
-                            <Users size={18} />
-                            MESAS ABERTAS
-                        </button>
+            <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 overflow-hidden">
+                <header className="bg-white border-b flex flex-col shrink-0 px-4 py-2 lg:py-0 lg:h-16 lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 overflow-hidden">
+                    <div className="flex items-center justify-between w-full lg:w-auto gap-2 lg:gap-4 shrink-0">
+                        <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+                            <h1 className="font-black text-xl text-gray-900 xl:block uppercase tracking-tighter italic shrink-0">Caixa</h1>
+                            <button
+                                onClick={() => { setIsTableModalOpen(true); fetchMesas(); }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 lg:px-4 lg:py-2 rounded-xl font-bold text-xs lg:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
+                            >
+                                <Users size={16} />
+                                <span className="hidden sm:inline">MESAS</span>
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 lg:flex-none flex justify-end">
+                            <ShiftManager />
+                        </div>
                     </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+
+                    <div className="relative w-full lg:max-w-[240px] xl:max-w-xs shrink-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                         <input
                             type="text"
-                            placeholder="Buscar produto (F2)..."
+                            placeholder="Buscar produtos..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="bg-gray-100 pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-primary w-80 font-medium"
-                            autoFocus
+                            className="bg-gray-100 pl-8 pr-3 py-2 lg:py-2 text-xs lg:text-sm rounded-xl border border-transparent focus:bg-white focus:border-primary w-full font-medium transition-all outline-none"
                         />
                     </div>
                 </header>
 
-                <main className="flex-1 p-6 overflow-y-auto bg-gray-50/50 space-y-8">
+                <main className="flex-1 p-3 lg:p-6 pb-28 lg:pb-6 overflow-y-auto bg-gray-50/50 space-y-6">
                     {sortedCategories.length === 0 ? (
-                        <div className="text-center py-20 text-gray-400 italic">Nenhum produto encontrado.</div>
+                        <div className="text-center py-10 lg:py-20 text-gray-400 italic text-sm">Nenhum produto encontrado.</div>
                     ) : (
                         sortedCategories.map(category => (
-                            <div key={category} className="space-y-4">
-                                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2 pb-2 border-b border-gray-200">
-                                    <span className="w-2 h-6 bg-primary rounded-full"></span>
+                            <div key={category} className="space-y-3 lg:space-y-4">
+                                <h3 className="text-base lg:text-lg font-bold text-gray-700 flex items-center gap-2 pb-1 lg:pb-2 border-b border-gray-200">
+                                    <span className="w-1.5 h-4 lg:w-2 lg:h-6 bg-primary rounded-full"></span>
                                     {category}
                                 </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-4">
                                     {groupedProducts[category].map((product: any) => (
                                         <button
                                             key={product.id}
@@ -275,17 +277,17 @@ const PosContent = () => {
                                                 }
                                             }}
                                             disabled={!product.disponivel || !caixa || caixa.status === 'FECHADO'}
-                                            className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center gap-2 border border-transparent hover:border-primary/20 active:scale-95 disabled:opacity-50 disabled:grayscale group"
+                                            className="bg-white p-2 lg:p-4 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center gap-1 lg:gap-2 border border-transparent hover:border-primary/20 active:scale-95 disabled:opacity-50 disabled:grayscale group"
                                         >
                                             {product.imagem ? (
-                                                <img src={product.imagem} alt={product.nome} className="w-24 h-24 object-cover rounded-lg group-hover:scale-105 transition-transform" />
+                                                <img src={product.imagem} alt={product.nome} className="w-12 h-12 lg:w-24 lg:h-24 object-cover rounded-md lg:rounded-lg group-hover:scale-105 transition-transform" />
                                             ) : (
-                                                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-300">
-                                                    <ShoppingCart size={32} />
+                                                <div className="w-12 h-12 lg:w-24 lg:h-24 bg-gray-100 rounded-md lg:rounded-lg flex items-center justify-center text-gray-300">
+                                                    <ShoppingCart size={24} className="lg:w-8 lg:h-8" />
                                                 </div>
                                             )}
-                                            <span className="font-medium text-sm text-gray-700 line-clamp-2 h-10">{product.nome}</span>
-                                            <span className="font-black text-primary">R$ {parseFloat(product.preco).toFixed(2)}</span>
+                                            <span className="font-medium text-[9px] lg:text-sm text-gray-700 line-clamp-2 h-6 lg:h-10 leading-tight">{product.nome}</span>
+                                            <span className="font-black text-xs lg:text-base text-primary leading-none">R$ {parseFloat(product.preco).toFixed(2)}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -294,15 +296,44 @@ const PosContent = () => {
                     )}
                 </main>
 
-                <footer className="h-12 bg-white border-t flex items-center px-6 text-xs text-gray-500 shrink-0">
+                <footer className="hidden lg:flex h-12 bg-white border-t items-center px-6 text-xs text-gray-500 shrink-0">
                     Atalhos: F2 Buscar | F4 Finalizar | Esc Cancelar
                 </footer>
             </div>
 
+            {/* Mobile Cart Floating Bar */}
+            {!isCartMobileOpen && (
+                <div className="lg:hidden fixed bottom-4 left-4 right-4 bg-white border border-gray-100 rounded-2xl p-4 z-30 flex justify-between items-center shadow-[0_10px_40px_rgba(0,0,0,0.15)]">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase">Total da Venda</span>
+                        <span className="text-xl sm:text-2xl font-black text-primary leading-none">R$ {total.toFixed(2)}</span>
+                    </div>
+                    <button 
+                        onClick={() => setIsCartMobileOpen(true)} 
+                        className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2 px-5 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-lg shadow-primary/30 transition-transform active:scale-95"
+                    >
+                        <ShoppingCart size={18} />
+                        CARRINHO ({cart.reduce((acc, item) => acc + item.quantidade, 0)})
+                    </button>
+                </div>
+            )}
+
+            {/* Mobile Overlay */}
+            {isCartMobileOpen && (
+                <div 
+                    className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+                    onClick={() => setIsCartMobileOpen(false)}
+                />
+            )}
+
             {/* Right Column: Cart & Checkout */}
-            <div className="w-96 bg-white flex flex-col shadow-xl z-20 shrink-0">
-                <div className="h-16 border-b flex items-center px-6 bg-gray-50 shrink-0">
-                    <div onClick={() => setIsClientModalOpen(true)} className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors">
+            <div className={`
+                fixed inset-x-0 bottom-0 z-50 bg-white flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl transition-transform duration-300
+                lg:static lg:w-96 lg:h-auto lg:rounded-none lg:shadow-xl lg:z-20 lg:translate-y-0 lg:border-l lg:border-gray-200 shrink-0
+                ${isCartMobileOpen ? 'translate-y-0 h-[90vh]' : 'translate-y-full lg:translate-y-0 h-[90vh] lg:h-auto'}
+            `}>
+                <div className="h-16 border-b flex items-center justify-between px-6 bg-gray-50 shrink-0 rounded-t-3xl lg:rounded-none">
+                    <div onClick={() => setIsClientModalOpen(true)} className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-2 -ml-2 rounded-lg transition-colors">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
                             <UserPlus size={20} />
                         </div>
@@ -311,6 +342,9 @@ const PosContent = () => {
                             <p className="text-xs text-gray-400">{clienteWhatsapp || 'Não identificado'}</p>
                         </div>
                     </div>
+                    <button onClick={() => setIsCartMobileOpen(false)} className="lg:hidden p-2 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full">
+                        <X size={20} />
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
@@ -361,7 +395,14 @@ const PosContent = () => {
                     )}
                 </div>
 
-                <div className="px-4 pb-4 bg-white border-b border-gray-50">
+                <div className="px-4 pb-4 bg-white border-b border-gray-50 shrink-0 space-y-2">
+                    <input
+                        type="text"
+                        value={clienteNome}
+                        onChange={e => setClienteNome(e.target.value)}
+                        placeholder="Nome do Cliente (Balcão/Mesa)"
+                        className="w-full text-sm font-bold p-3 rounded-xl border border-gray-100 focus:outline-none focus:border-primary bg-gray-50/50"
+                    />
                     <textarea
                         value={orderObservation}
                         onChange={e => setOrderObservation(e.target.value)}
@@ -370,10 +411,10 @@ const PosContent = () => {
                     />
                 </div>
 
-                <div className="bg-gray-50 border-t p-6 space-y-4 shrink-0">
+                <div className="bg-gray-50 border-t p-6 pb-8 lg:pb-6 space-y-4 shrink-0">
                     <div className="flex justify-between items-end">
                         <span className="text-gray-500 font-medium">Subtotal</span>
-                        <span className="text-xl font-bold text-gray-800">R$ {total.toFixed(2)}</span>
+                        <span className="text-2xl font-black text-gray-800 leading-none">R$ {total.toFixed(2)}</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -383,7 +424,7 @@ const PosContent = () => {
                             className="py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm uppercase rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center gap-1"
                         >
                             <ChefHat size={18} />
-                            Fazer Pedido
+                            Cozinha
                         </button>
                         <button
                             onClick={() => setIsCheckoutModalOpen(true)}
@@ -406,46 +447,46 @@ const PosContent = () => {
                             <button onClick={() => setIsCheckoutModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold">ESC</button>
                         </div>
 
-                        <div className="p-8 space-y-6">
+                        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
                             <div className="text-center space-y-1">
-                                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total a Pagar</p>
-                                <p className="text-5xl font-black text-gray-900 tracking-tighter">R$ {total.toFixed(2)}</p>
+                                <p className="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-widest">Total a Pagar</p>
+                                <p className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tighter shrink-0">R$ {total.toFixed(2)}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
                                 {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map(method => (
                                     <button
                                         key={method}
                                         onClick={() => setPaymentMethod(method)}
-                                        className={`p-4 rounded-xl border-2 font-bold uppercase text-sm transition-all flex flex-col items-center gap-2 ${paymentMethod === method
+                                        className={`p-3 sm:p-4 rounded-xl border-2 font-bold uppercase text-xs sm:text-sm transition-all flex flex-col items-center gap-1 sm:gap-2 ${paymentMethod === method
                                             ? 'border-primary bg-primary/5 text-primary'
                                             : 'border-gray-100 hover:border-gray-200 text-gray-500'
                                             }`}
                                     >
-                                        {method === 'DINHEIRO' && <Banknote size={24} />}
-                                        {method === 'DEBITO' && <CreditCard size={24} />}
-                                        {method === 'CREDITO' && <CreditCard size={24} />}
-                                        {method === 'PIX' && <QrCode size={24} />}
+                                        {method === 'DINHEIRO' && <Banknote size={24} className="sm:w-6 sm:h-6 w-5 h-5" />}
+                                        {method === 'DEBITO' && <CreditCard size={24} className="sm:w-6 sm:h-6 w-5 h-5" />}
+                                        {method === 'CREDITO' && <CreditCard size={24} className="sm:w-6 sm:h-6 w-5 h-5" />}
+                                        {method === 'PIX' && <QrCode size={24} className="sm:w-6 sm:h-6 w-5 h-5" />}
                                         {method}
                                     </button>
                                 ))}
                             </div>
 
                             {paymentMethod === 'DINHEIRO' && (
-                                <div className="space-y-2 bg-yellow-50 p-4 rounded-xl border border-yellow-100">
-                                    <label className="text-xs font-bold uppercase text-yellow-700">Valor Recebido</label>
-                                    <div className="flex gap-4 items-center">
+                                <div className="space-y-2 bg-yellow-50 p-3 sm:p-4 rounded-xl border border-yellow-100">
+                                    <label className="text-[10px] sm:text-xs font-bold uppercase text-yellow-700">Valor Recebido</label>
+                                    <div className="flex sm:flex-row gap-3 sm:gap-4 items-center">
                                         <input
                                             type="number"
                                             value={amountPaid}
                                             onChange={e => setAmountPaid(e.target.value)}
-                                            className="flex-1 text-2xl font-black bg-white p-2 rounded-lg border border-yellow-200 focus:outline-none focus:border-yellow-400"
+                                            className="w-full text-xl sm:text-2xl font-black bg-white p-2 rounded-lg border border-yellow-200 focus:outline-none focus:border-yellow-400 min-w-0"
                                             placeholder="0,00"
                                             autoFocus
                                         />
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-gray-400 uppercase">Troco</p>
-                                            <p className="text-xl font-black text-gray-800">R$ {change.toFixed(2)}</p>
+                                        <div className="text-right shrink-0">
+                                            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase">Troco</p>
+                                            <p className="text-lg sm:text-xl font-black text-gray-800">R$ {change.toFixed(2)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -453,7 +494,7 @@ const PosContent = () => {
 
                             <button
                                 onClick={handleCheckout}
-                                className="w-full py-5 bg-green-600 hover:bg-green-700 text-white font-black text-xl uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95"
+                                className="w-full py-4 sm:py-5 bg-green-600 hover:bg-green-700 text-white font-black text-lg sm:text-xl uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95"
                             >
                                 Confirmar Pagamento
                             </button>
@@ -479,21 +520,58 @@ const PosContent = () => {
                                     {mesas.length === 0 ? (
                                         <div className="col-span-full py-10 text-center text-gray-400 font-medium italic">Nenhuma mesa ocupada no momento.</div>
                                     ) : (
-                                        mesas.map(m => (
-                                            <button
-                                                key={m.mesa}
-                                                onClick={() => handleImportTable(m.mesa)}
-                                                className="bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-2xl p-4 flex flex-col items-center gap-2 transition-all active:scale-95"
-                                            >
-                                                <div className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center font-black text-lg">
-                                                    {m.mesa}
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-xs font-black text-red-600 uppercase tracking-tighter">R$ {parseFloat(m.total).toFixed(2)}</p>
-                                                    <p className="text-[10px] font-bold text-red-400 uppercase">{m.itens_count} itens</p>
-                                                </div>
-                                            </button>
-                                        ))
+                                        mesas.map(m => {
+                                            const isBalcao = m.label?.startsWith('B-');
+                                            
+                                            // Determine colors based on status for Balcao
+                                            let bgClass = 'bg-red-50 hover:bg-red-100 border-red-200';
+                                            let pillClass = 'bg-red-500 w-10 h-10 text-sm';
+                                            let textClass = 'text-red-600';
+                                            let subTextClass = 'text-red-400';
+                                            let statusLabel = '';
+
+                                            if (isBalcao) {
+                                                if (m.status === 'PRONTO') {
+                                                    bgClass = 'bg-green-50 hover:bg-green-100 border-green-200';
+                                                    pillClass = 'bg-green-500 px-3 py-1 text-[11px] tracking-widest';
+                                                    textClass = 'text-green-600';
+                                                    subTextClass = 'text-green-400';
+                                                    statusLabel = 'PRONTO';
+                                                } else if (m.status === 'PREPARO') {
+                                                    bgClass = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
+                                                    pillClass = 'bg-yellow-500 px-3 py-1 text-[11px] tracking-widest';
+                                                    textClass = 'text-yellow-700';
+                                                    subTextClass = 'text-yellow-500';
+                                                    statusLabel = 'PREPARO';
+                                                } else {
+                                                    bgClass = 'bg-orange-50 hover:bg-orange-100 border-orange-200';
+                                                    pillClass = 'bg-orange-500 px-3 py-1 text-[11px] tracking-widest';
+                                                    textClass = 'text-orange-600';
+                                                    subTextClass = 'text-orange-400';
+                                                    statusLabel = 'NOVO';
+                                                }
+                                            }
+
+                                            return (
+                                                <button
+                                                    key={m.mesa}
+                                                    onClick={() => handleImportTable(m.mesa)}
+                                                    className={`border-2 rounded-2xl p-4 flex flex-col items-center gap-2 transition-all active:scale-95 ${bgClass}`}
+                                                >
+                                                    <div className={`rounded-full text-white flex flex-col items-center justify-center font-black ${pillClass}`}>
+                                                        <span>{isBalcao ? `BALCÃO #${m.label.replace('B-', '')}` : m.mesa}</span>
+                                                        {isBalcao && <span className="text-[8px] opacity-90 uppercase leading-none mt-0.5">{statusLabel}</span>}
+                                                    </div>
+                                                    <div className="text-center w-full">
+                                                        {m.cliente_nome && m.cliente_nome !== 'Consumidor Final' && (
+                                                            <p className="text-[10px] font-bold text-gray-700 truncate w-full px-1">{m.cliente_nome}</p>
+                                                        )}
+                                                        <p className={`text-xs font-black uppercase tracking-tighter ${textClass}`}>R$ {parseFloat(m.total).toFixed(2)}</p>
+                                                        <p className={`text-[10px] font-bold uppercase ${subTextClass}`}>{m.itens_count} itens</p>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
                                     )}
                                 </div>
                             )}
@@ -528,12 +606,14 @@ const PosContent = () => {
                             <div className="space-y-2">
                                 <label className="text-xs font-bold uppercase text-gray-400">WhatsApp (Opcional)</label>
                                 <input
-                                    type="text"
+                                    type="tel"
                                     value={clienteWhatsapp}
-                                    onChange={e => setClienteWhatsapp(e.target.value)}
+                                    onChange={e => setClienteWhatsapp(e.target.value.replace(/\D/g, ''))}
                                     className="w-full text-lg font-bold bg-gray-50 p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary"
-                                    placeholder="Ex: 5511999999999"
+                                    placeholder="Ex: 11999999999"
+                                    maxLength={15}
                                 />
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-1">* Somente números com DDD</p>
                             </div>
                             <button
                                 onClick={() => setIsClientModalOpen(false)}

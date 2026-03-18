@@ -18,7 +18,14 @@ interface Store {
     status_assinatura: 'trial' | 'active' | 'expired' | 'canceled';
     valido_ate: string | null;
     plano_details: Plano | null;
+    plano_tipo: 'START' | 'PRO' | 'ELITE';
     horario_funcionamento?: any;
+    cor_primaria?: string;
+    cor_secundaria?: string;
+    logo?: string | null;
+    categorias?: any[];
+    modo_catalogo?: boolean;
+    quantidade_mesas?: number;
 }
 
 interface BillingContextType {

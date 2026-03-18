@@ -12,3 +12,5 @@ channels
 channels_redis
 requests
 mercadopago
+google-generativeai
+apscheduler==3.10.4

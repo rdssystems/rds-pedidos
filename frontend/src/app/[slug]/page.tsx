@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { ProductModal } from '@/components/Menu/ProductModal';
 import { ShoppingBag, ChevronRight, X, Clock, MapPin, Phone } from 'lucide-react';
@@ -20,6 +20,7 @@ interface StoreData {
     tipo_taxa_entrega?: 'FIXA' | 'BAIRRO';
     taxa_entrega_fixa?: string;
     bairros_entrega?: { id: number, nome: string, taxa: string, ativo: boolean }[];
+    modo_catalogo?: boolean;
 }
 
 const DIAS_MAP: Record<number, string> = {
@@ -27,10 +28,12 @@ const DIAS_MAP: Record<number, string> = {
 };
 
 type PaymentMethod = 'DINHEIRO' | 'DEBITO' | 'CREDITO' | 'PIX';
-type DeliveryMethod = 'ENTREGA' | 'RETIRADA';
+type DeliveryMethod = 'ENTREGA' | 'RETIRADA' | 'MESA';
 
 export default function PublicMenuPage() {
     const { slug } = useParams();
+    const searchParams = useSearchParams();
+    const mesaParam = searchParams.get('mesa');
     const { cart, addToCart, removeFromCart, total, clearCart } = useCart();
 
     const [store, setStore] = useState<StoreData | null>(null);
@@ -49,7 +52,7 @@ export default function PublicMenuPage() {
         endereco_numero: '',
         endereco_bairro: '',
         pagamento: 'PIX' as PaymentMethod,
-        metodo_entrega: 'ENTREGA' as DeliveryMethod,
+        metodo_entrega: (mesaParam ? 'MESA' : 'ENTREGA') as DeliveryMethod,
         troco: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -145,7 +148,6 @@ export default function PublicMenuPage() {
                     return;
                 }
                 const data = await response.json();
-                console.log('DEBUG: Store Data:', data);
                 setStore(data);
                 checkStoreStatus(data);
             } catch (error) {
@@ -236,10 +238,12 @@ export default function PublicMenuPage() {
                 loja: store.id,
                 cliente_nome: checkoutData.nome,
                 cliente_whatsapp: checkoutData.telefone,
-                endereco: fullAddress, // This will be either the full address or "Retirada na Loja"
+                endereco: checkoutData.metodo_entrega === 'MESA' ? `Mesa ${mesaParam}` : fullAddress,
                 total: grandTotal,
                 taxa_entrega: deliveryFee,
                 forma_pagamento: checkoutData.pagamento,
+                tipo: checkoutData.metodo_entrega,
+                mesa: checkoutData.metodo_entrega === 'MESA' ? parseInt(mesaParam || '0') : null,
                 itens: cart.map(item => ({
                     produto: item.productId,
                     quantidade: item.quantidade,
@@ -282,7 +286,6 @@ export default function PublicMenuPage() {
                 item.atributos.forEach(attr => {
                     message += `   └ _${attr.nome} (+${formatCurrency(Number(attr.preco))})_\n`;
                 });
-                // message += `   💲 _Subtotal: ${formatCurrency(itemTotal)}_\n`; 
                 message += `\n`;
             });
 
@@ -293,14 +296,20 @@ export default function PublicMenuPage() {
                 } else {
                     message += `🛵 *Taxa de Entrega:* Grátis\n\n`;
                 }
+            } else if (checkoutData.metodo_entrega === 'MESA') {
+                message += `🪑 *MESA:*\nPedido realizado na *Mesa ${mesaParam}*\n\n`;
             } else {
                 message += `🛍️ *RETIRADA:*\nO cliente vai retirar o pedido na loja.\n\n`;
             }
 
             message += `💳 *PAGAMENTO:*\n`;
-            message += `Forma: ${checkoutData.pagamento}\n`;
-            if (checkoutData.pagamento === 'DINHEIRO' && checkoutData.troco) {
-                message += `Troco para: R$ ${checkoutData.troco}\n`;
+            if (checkoutData.metodo_entrega === 'MESA') {
+                message += `Forma: Pagamento no Caixa\n`;
+            } else {
+                message += `Forma: ${checkoutData.pagamento}\n`;
+                if (checkoutData.pagamento === 'DINHEIRO' && checkoutData.troco) {
+                    message += `Troco para: R$ ${checkoutData.troco}\n`;
+                }
             }
 
             message += `\n💰 *SUBTOTAL:* ${formatCurrency(total)}\n`;
@@ -313,8 +322,8 @@ export default function PublicMenuPage() {
             // Open WhatsApp
             // Ensure encoded message handles special characters correctly
             const encoded = encodeURIComponent(message);
-            const cleanPhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
-            window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
+            const storePhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
+            window.open(`https://wa.me/${storePhone}?text=${encoded}`, '_blank');
 
             clearCart();
             setIsCartOpen(false);
@@ -326,7 +335,7 @@ export default function PublicMenuPage() {
                 endereco_numero: '',
                 endereco_bairro: '',
                 pagamento: 'PIX',
-                metodo_entrega: 'ENTREGA',
+                metodo_entrega: (mesaParam ? 'MESA' : 'ENTREGA') as DeliveryMethod,
                 troco: ''
             });
             alert('Pedido enviado com sucesso!');
@@ -493,40 +502,53 @@ export default function PublicMenuPage() {
                 </main>
 
                 {/* Sticky Footers (Alternative CTAs) */}
-                <div className="fixed bottom-0 left-0 right-0 p-6 flex flex-col gap-3 pointer-events-none z-50">
-                    {/* Cart Button (If items exist) */}
-                    {cart.length > 0 ? (
-                        <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
-                            <button
-                                onClick={() => setIsCartOpen(true)}
-                                className="w-full max-w-md text-white px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group"
-                                style={{ backgroundColor: store.cor_primaria }}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-white rounded-2xl w-8 h-8 flex items-center justify-center text-sm font-black italic shadow-lg" style={{ color: store.cor_primaria }}>
-                                        {cart.reduce((s, i) => s + i.quantidade, 0)}
+                {!store.modo_catalogo && (
+                    <div className="fixed bottom-0 left-0 right-0 p-6 flex flex-col gap-3 pointer-events-none z-50">
+                        {/* Cart Button (If items exist) */}
+                        {cart.length > 0 ? (
+                            <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
+                                <button
+                                    onClick={() => setIsCartOpen(true)}
+                                    className="w-full max-w-md text-white px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group"
+                                    style={{ backgroundColor: store.cor_primaria }}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-white rounded-2xl w-8 h-8 flex items-center justify-center text-sm font-black italic shadow-lg" style={{ color: store.cor_primaria }}>
+                                            {cart.reduce((s, i) => s + i.quantidade, 0)}
+                                        </div>
+                                        <span className="font-black uppercase italic tracking-widest text-sm">Ver Sacola</span>
                                     </div>
-                                    <span className="font-black uppercase italic tracking-widest text-sm">Ver Sacola</span>
-                                </div>
-                                <span className="font-black text-xl italic tracking-tighter">R$ {total.toFixed(2)}</span>
-                            </button>
-                        </div>
-                    ) : (
-                        /* Default WhatsApp Action (Always visible if cart is empty) */
+                                    <span className="font-black text-xl italic tracking-tighter">R$ {total.toFixed(2)}</span>
+                                </button>
+                            </div>
+                        ) : (
+                            /* Default WhatsApp Action (Always visible if cart is empty) */
+                            <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
+                                <button
+                                    onClick={() => window.open(`https://wa.me/${formatWhatsappNumber(store.whatsapp)}`)}
+                                    className="w-full max-w-md bg-white text-gray-900 border-b-4 px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group font-black uppercase italic tracking-tighter text-sm"
+                                    style={{ borderBottomColor: store.cor_primaria }}
+                                >
+                                    <span>Dúvidas? Chame no WhatsApp</span>
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-500 text-white animate-pulse">
+                                        <ShoppingBag size={18} />
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {store.modo_catalogo && (
+                    <div className="fixed bottom-0 left-0 right-0 p-6 flex flex-col gap-3 pointer-events-none z-50">
                         <div className="flex justify-center w-full pointer-events-auto animate-slide-up">
-                            <button
-                                onClick={() => window.open(`https://wa.me/${formatWhatsappNumber(store.whatsapp)}`)}
-                                className="w-full max-w-md bg-white text-gray-900 border-b-4 px-8 py-5 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all hover:scale-[1.02] active:scale-95 group font-black uppercase italic tracking-tighter text-sm"
-                                style={{ borderBottomColor: store.cor_primaria }}
-                            >
-                                <span>Dúvidas? Chame no WhatsApp</span>
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-500 text-white animate-pulse">
-                                    <ShoppingBag size={18} />
-                                </div>
-                            </button>
+                            <div className="w-full max-w-md bg-white/90 backdrop-blur-md text-gray-500 border-2 border-dashed border-gray-200 px-8 py-5 rounded-[2rem] shadow-2xl flex flex-col items-center gap-1">
+                                <span className="font-black uppercase italic tracking-tighter text-sm">Modo Catálogo</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Pedidos desabilitados via site</span>
+                            </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {/* Cart Drawer */}
                 {
@@ -601,13 +623,13 @@ export default function PublicMenuPage() {
                                                         setCheckoutData({ ...checkoutData, telefone: val });
                                                     }}
                                                     className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                    placeholder="11999999999"
+                                                    placeholder="Ex: 11999999999"
                                                     maxLength={11}
                                                 />
-                                                <p className="text-[10px] text-gray-400 font-bold ml-2">Apenas números (DDD + Número)</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-2">* Somente números com DDD</p>
                                             </div>
 
-                                            {checkoutData.metodo_entrega === 'ENTREGA' && (
+                                            {!mesaParam && checkoutData.metodo_entrega === 'ENTREGA' && (
                                                 <div className="space-y-4 animate-slide-up">
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Endereço de Entrega</label>
@@ -662,73 +684,113 @@ export default function PublicMenuPage() {
 
                                             <div className="h-px bg-gray-100 w-full my-4"></div>
 
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Como vai querer receber?</label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {['ENTREGA', 'RETIRADA'].map((method) => (
-                                                        <button
-                                                            key={method}
-                                                            onClick={() => setCheckoutData({ ...checkoutData, metodo_entrega: method as DeliveryMethod })}
-                                                            className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.metodo_entrega === method
-                                                                ? 'bg-blue-900 text-white border-blue-900 shadow-md'
-                                                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
-                                                                }`}
-                                                        >
-                                                            {method === 'ENTREGA' ? 'Receber em Casa' : 'Retirar na Loja'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Forma de Pagamento</label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map((method) => (
-                                                        <button
-                                                            key={method}
-                                                            onClick={() => setCheckoutData({ ...checkoutData, pagamento: method as PaymentMethod })}
-                                                            className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.pagamento === method
-                                                                ? 'bg-gray-900 text-white border-gray-900'
-                                                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
-                                                                }`}
-                                                        >
-                                                            {method}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {checkoutData.pagamento === 'DINHEIRO' && (
-                                                <div className="space-y-2 animate-slide-up">
-                                                    <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Troco para quanto?</label>
-                                                    <input
-                                                        type="text"
-                                                        value={checkoutData.troco}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value.replace(/[^0-9.,]/g, '');
-                                                            setCheckoutData({ ...checkoutData, troco: val });
-                                                        }}
-                                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
-                                                        placeholder="Ex: 50.00"
-                                                    />
+                                            {!mesaParam && (
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Como vai querer receber?</label>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {(mesaParam ? ['MESA', 'RETIRADA'] : ['ENTREGA', 'RETIRADA']).map((method) => (
+                                                            <button
+                                                                key={method}
+                                                                onClick={() => setCheckoutData({ ...checkoutData, metodo_entrega: method as DeliveryMethod })}
+                                                                className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.metodo_entrega === method
+                                                                    ? 'bg-blue-900 text-white border-blue-900 shadow-md'
+                                                                    : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                                                                    }`}
+                                                            >
+                                                                {method === 'ENTREGA' ? 'Receber em Casa' : method === 'MESA' ? `Estou na Mesa ${mesaParam}` : 'Retirar na Loja'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
-                                            <div className="bg-blue-50 p-6 rounded-[2rem] space-y-2 mt-4">
-                                                <div className="flex justify-between text-gray-500 text-sm font-bold">
-                                                    <span>Subtotal</span>
-                                                    <span>{formatCurrency(total)}</span>
+                                            {mesaParam && (
+                                                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
+                                                    <span className="text-xs font-black uppercase text-indigo-900">Local do Pedido</span>
+                                                    <span className="font-black text-indigo-600 italic">MESA {mesaParam}</span>
                                                 </div>
-                                                <div className="flex justify-between text-gray-500 text-sm font-bold">
-                                                    <span>Taxa de Entrega</span>
-                                                    <span>{checkoutData.metodo_entrega === 'ENTREGA' ? (deliveryFee > 0 ? formatCurrency(deliveryFee) : (store.tipo_taxa_entrega === 'BAIRRO' && !checkoutData.endereco_bairro ? 'A calcular' : 'Grátis')) : 'Grátis'}</span>
+                                            )}
+
+                                            {!mesaParam && (
+                                                <>
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Forma de Pagamento</label>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map((method) => (
+                                                                <button
+                                                                    key={method}
+                                                                    onClick={() => setCheckoutData({ ...checkoutData, pagamento: method as PaymentMethod })}
+                                                                    className={`p-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all border-2 ${checkoutData.pagamento === method
+                                                                        ? 'bg-gray-900 text-white border-gray-900'
+                                                                        : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                                                                        }`}
+                                                                >
+                                                                    {method}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {checkoutData.pagamento === 'DINHEIRO' && (
+                                                        <div className="space-y-2 animate-slide-up">
+                                                            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-2">Troco para quanto?</label>
+                                                            <input
+                                                                type="text"
+                                                                value={checkoutData.troco}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                                                    setCheckoutData({ ...checkoutData, troco: val });
+                                                                }}
+                                                                className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold focus:outline-none focus:border-gray-300"
+                                                                placeholder="Ex: 50.00"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {mesaParam ? (
+                                                <div className="bg-indigo-50/50 p-6 rounded-[2rem] space-y-3 mt-4 border border-indigo-100/50">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <ShoppingBag size={16} className="text-indigo-600" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Itens do Pedido</span>
+                                                    </div>
+                                                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                                        {cart.map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-start gap-4 py-2 border-b border-indigo-100/30 last:border-0">
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs font-black text-indigo-900">{item.quantidade}x</span>
+                                                                        <span className="text-xs font-bold text-gray-700">{item.nome}</span>
+                                                                    </div>
+                                                                    {item.atributos.length > 0 && (
+                                                                        <p className="text-[9px] text-gray-400 mt-0.5 ml-6">
+                                                                            {item.atributos.map(a => a.nome).join(', ')}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[10px] font-black text-gray-500">{formatCurrency((item.precoBase + item.atributos.reduce((s, a) => s + a.preco, 0)) * item.quantidade)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                                <div className="h-[1px] bg-blue-100 my-2"></div>
-                                                <div className="flex justify-between text-2xl font-black text-blue-900">
-                                                    <span>Total</span>
-                                                    <span>{formatCurrency(grandTotal)}</span>
+                                            ) : (
+                                                <div className="bg-blue-50 p-6 rounded-[2rem] space-y-2 mt-4">
+                                                    <div className="flex justify-between text-gray-500 text-sm font-bold">
+                                                        <span>Subtotal</span>
+                                                        <span>{formatCurrency(total)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-gray-500 text-sm font-bold">
+                                                        <span>Taxa de Entrega</span>
+                                                        <span>{checkoutData.metodo_entrega === 'ENTREGA' ? (deliveryFee > 0 ? formatCurrency(deliveryFee) : (store.tipo_taxa_entrega === 'BAIRRO' && !checkoutData.endereco_bairro ? 'A calcular' : 'Grátis')) : 'Grátis'}</span>
+                                                    </div>
+                                                    <div className="h-[1px] bg-blue-100 my-2"></div>
+                                                    <div className="flex justify-between text-2xl font-black text-blue-900">
+                                                        <span>Total</span>
+                                                        <span>{formatCurrency(grandTotal)}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -737,10 +799,12 @@ export default function PublicMenuPage() {
                                 <div className="p-8 bg-gray-50/80 backdrop-blur border-t space-y-6">
                                     {view === 'cart' ? (
                                         <>
-                                            <div className="flex justify-between items-end">
-                                                <span className="font-black text-xs text-gray-400 uppercase tracking-widest">Valor do Pedido</span>
-                                                <span className="font-black text-4xl italic tracking-tighter" style={{ color: store.cor_primaria }}>{formatCurrency(view === 'cart' ? total : grandTotal)}</span>
-                                            </div>
+                                            {!mesaParam && (
+                                                <div className="flex justify-between items-end">
+                                                    <span className="font-black text-xs text-gray-400 uppercase tracking-widest">Valor do Pedido</span>
+                                                    <span className="font-black text-4xl italic tracking-tighter" style={{ color: store.cor_primaria }}>{formatCurrency(view === 'cart' ? total : grandTotal)}</span>
+                                                </div>
+                                            )}
                                             <button
                                                 onClick={() => setView('checkout')}
                                                 disabled={cart.length === 0}
@@ -778,6 +842,7 @@ export default function PublicMenuPage() {
                         isOpen={!!selectedProduct}
                         product={selectedProduct}
                         storeColor={store.cor_primaria}
+                        modoCatalogo={store.modo_catalogo}
                         onClose={() => setSelectedProduct(null)}
                         onAddToCart={(item) => {
                             addToCart(item);

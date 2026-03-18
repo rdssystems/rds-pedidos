@@ -77,7 +77,7 @@ export default function WhatsAppPage() {
         setStatus('connecting');
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/lojas/${instanceName}/whatsapp-connect//`, {
+            const response = await fetch(`/api/lojas/${instanceName}/whatsapp-connect/`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -98,8 +98,10 @@ export default function WhatsAppPage() {
         if (!confirm('Tem certeza que deseja desconectar o WhatsApp?')) return;
 
         try {
+            const token = localStorage.getItem('token');
             await fetch(`/api/lojas/${instanceName}/whatsapp-disconnect/`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             setStatus('disconnected');
             setQrCode(null);
@@ -118,12 +120,7 @@ export default function WhatsAppPage() {
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-10">
-            <header>
-                <h1 className="text-3xl font-black text-gray-900 italic uppercase tracking-tighter">Integração WhatsApp</h1>
-                <p className="text-gray-500 mt-1">Conecte sua conta para enviar notificações automáticas e gerenciar pedidos.</p>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mt-6">
                 {/* Status Card */}
                 <div className="lg:col-span-7 space-y-8">
                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">

@@ -14,8 +14,11 @@ import {
     Clock,
     Truck,
     Plus,
-    Trash2
+    Trash2,
+    QrCode
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
+import { useBilling } from '@/context/BillingContext';
 
 const DIAS_SEMANA = [
     { key: 'seg', label: 'Segunda-feira' },
@@ -28,6 +31,7 @@ const DIAS_SEMANA = [
 ];
 
 export default function StoreSettings() {
+    const { refreshBilling } = useBilling();
     const [storeId, setStoreId] = useState<number | null>(null);
     const [storeSlug, setStoreSlug] = useState<string | null>(null);
     const [storeName, setStoreName] = useState('Minha Loja');
@@ -52,6 +56,11 @@ export default function StoreSettings() {
     const [novoBairroNome, setNovoBairroNome] = useState('');
     const [novoBairroTaxa, setNovoBairroTaxa] = useState('');
     const [isAddingBairro, setIsAddingBairro] = useState(false);
+
+    // QR & Catalog Settings
+    const [modoCatalogo, setModoCatalogo] = useState(false);
+    const [quantidadeMesas, setQuantidadeMesas] = useState(0);
+    const [showQRs, setShowQRs] = useState(false);
 
     type DaySchedule = {
         open: string;
@@ -139,6 +148,13 @@ export default function StoreSettings() {
                     setTipoTaxaEntrega(s.tipo_taxa_entrega || 'FIXA');
                     setTaxaEntregaFixa(s.taxa_entrega_fixa ? parseFloat(s.taxa_entrega_fixa).toFixed(2) : '0.00');
                     setBairros(s.bairros_entrega || []);
+
+                    // QR & Catalog
+                    setModoCatalogo(s.modo_catalogo || false);
+                    setQuantidadeMesas(s.quantidade_mesas || 0);
+                    if (s.quantidade_mesas > 0) {
+                        setShowQRs(true);
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -197,6 +213,9 @@ export default function StoreSettings() {
                 formData.append('banner', bannerFile);
             }
 
+            formData.append('modo_catalogo', String(modoCatalogo));
+            formData.append('quantidade_mesas', String(quantidadeMesas));
+
             const token = localStorage.getItem('token');
             // Using slug since look_up is set to slug in backend
             const res = await fetch(`/api/lojas/${storeSlug}/`, {
@@ -209,6 +228,7 @@ export default function StoreSettings() {
 
             if (res.ok) {
                 setSaved(true);
+                refreshBilling(); // Refresh global store context
                 setTimeout(() => setSaved(false), 3000);
             } else {
                 const data = await res.json();
@@ -390,12 +410,14 @@ export default function StoreSettings() {
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">WhatsApp</label>
                                     <input
-                                        type="text"
+                                        type="tel"
                                         value={whatsapp}
-                                        onChange={(e) => setWhatsapp(e.target.value)}
-                                        placeholder="5511999999999"
+                                        onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="Ex: 11999999999"
+                                        maxLength={11}
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-bold"
                                     />
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-1">* Somente números com DDD</p>
                                 </div>
                             </div>
 
@@ -767,6 +789,141 @@ export default function StoreSettings() {
                                             ))}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Atendimento de Mesa e QR Code - NOVO */}
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 space-y-6">
+                        <div className="flex items-center gap-3 border-l-4 border-indigo-500 pl-4">
+                            <QrCode className="text-indigo-500" />
+                            <h2 className="text-xl font-bold text-gray-900 uppercase italic">Atendimento de Mesa & QR Code</h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-gray-800 text-sm italic uppercase">Modo Apenas Catálogo</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Desativa pedidos pelo cliente</p>
+                                </div>
+                                <div 
+                                    className="relative inline-flex items-center cursor-pointer"
+                                    onClick={() => setModoCatalogo(!modoCatalogo)}
+                                >
+                                    <div className={`w-11 h-6 transition-colors rounded-full relative ${modoCatalogo ? 'bg-indigo-500' : 'bg-gray-200'}`}>
+                                        <div className={`absolute top-[2px] left-[2px] bg-white rounded-full h-5 w-5 transition-transform ${modoCatalogo ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Passo 1: Quantidade de Mesas</label>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={quantidadeMesas}
+                                            onChange={(e) => {
+                                                setQuantidadeMesas(parseInt(e.target.value) || 0);
+                                            }}
+                                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setShowQRs(true)}
+                                        disabled={quantidadeMesas <= 0}
+                                        className="bg-indigo-500 text-white px-6 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-indigo-600 transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+                                    >
+                                        Gerar QR Codes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {showQRs && quantidadeMesas > 0 && (
+                            <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 space-y-6 animate-slide-up print:bg-white print:border-none print:p-0">
+                                <div className="flex items-center justify-between print:hidden">
+                                    <h3 className="font-black text-indigo-900 uppercase italic tracking-tighter">QR Codes Gerados</h3>
+                                    <button 
+                                        onClick={() => window.print()}
+                                        className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-50 transition-colors shadow-sm"
+                                    >
+                                        Imprimir Todos
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 print:grid-cols-2 print:gap-10">
+                                    {Array.from({ length: quantidadeMesas }, (_, i) => i + 1).map((mesa) => {
+                                        const url = typeof window !== 'undefined' ? `${window.location.origin}/${storeSlug}?mesa=${mesa}` : `/${storeSlug}?mesa=${mesa}`;
+                                        const qrId = `qr-mesa-${mesa}`;
+                                        
+                                        const downloadQR = () => {
+                                            const svg = document.getElementById(qrId);
+                                            if (!svg) return;
+                                            const svgData = new XMLSerializer().serializeToString(svg);
+                                            const canvas = document.createElement("canvas");
+                                            const ctx = canvas.getContext("2d");
+                                            const img = new Image();
+                                            img.onload = () => {
+                                                canvas.width = 1000;
+                                                canvas.height = 1000;
+                                                ctx!.fillStyle = "white";
+                                                ctx!.fillRect(0, 0, canvas.width, canvas.height);
+                                                ctx!.drawImage(img, 50, 50, 900, 900);
+                                                
+                                                // Add label to image
+                                                ctx!.fillStyle = "black";
+                                                ctx!.font = "bold 60px Arial";
+                                                ctx!.textAlign = "center";
+                                                ctx!.fillText(`MESA ${mesa} - ${storeName}`, 500, 950);
+
+                                                const pngFile = canvas.toDataURL("image/png");
+                                                const downloadLink = document.createElement("a");
+                                                downloadLink.download = `QR_MESA_${mesa}_${storeSlug}.png`;
+                                                downloadLink.href = pngFile;
+                                                downloadLink.click();
+                                            };
+                                            img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                                        };
+
+                                        return (
+                                            <div key={mesa} className="bg-white p-6 rounded-[2rem] shadow-sm border border-indigo-100 flex flex-col items-center gap-4 group transition-all print:shadow-none print:border-2 print:border-gray-200">
+                                                <div className="bg-white p-4 rounded-2xl border border-gray-50 group-hover:border-indigo-200 transition-colors">
+                                                    <QRCode 
+                                                        id={qrId}
+                                                        value={url}
+                                                        size={200}
+                                                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                                        viewBox={`0 0 256 256`}
+                                                    />
+                                                </div>
+                                                <div className="text-center">
+                                                    <span className="font-black text-indigo-900 text-lg uppercase italic block">MESA {mesa}</span>
+                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{storeSlug}</span>
+                                                </div>
+                                                
+                                                <div className="flex gap-2 w-full print:hidden">
+                                                    <button 
+                                                        onClick={downloadQR}
+                                                        className="flex-1 bg-gray-50 hover:bg-indigo-50 text-indigo-600 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
+                                                    >
+                                                        Salvar Imagem
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(url);
+                                                            alert(`Link da Mesa ${mesa} copiado!`);
+                                                        }}
+                                                        className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
+                                                    >
+                                                        Copiar Link
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
