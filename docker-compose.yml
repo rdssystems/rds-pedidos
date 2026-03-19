@@ -2,13 +2,14 @@ services:
   db:
     image: postgres:15-alpine
     container_name: gerenciador-db
+    restart: always
+    mem_limit: 512M
     volumes:
       - ./data/db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=${DB_NAME:-gerenciador}
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
-    restart: always
 
   redis:
     image: redis:alpine
@@ -19,6 +20,8 @@ services:
     image: evoapicloud/evolution-api:latest
     container_name: gerenciador-evolution
     restart: always
+    init: true
+    mem_limit: 800M
     ports:
       - "8081:8080"
     environment:
@@ -43,6 +46,9 @@ services:
       dockerfile: Dockerfile
     container_name: gerenciador-backend
     command: daphne -b 0.0.0.0 -p 8000 core.asgi:application
+    restart: always
+    init: true
+    mem_limit: 600M
     volumes:
       - ./backend:/app
       - ./data/media:/app/media
@@ -68,13 +74,15 @@ services:
     depends_on:
       - db
       - redis
-    restart: always
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: rds-frontend
+    restart: always
+    init: true
+    mem_limit: 1G
     environment:
       - NEXT_PUBLIC_API_URL=${API_URL:-http://localhost/api}
       - NODE_ENV=production
@@ -82,30 +90,36 @@ services:
     depends_on:
       - backend
       - redis
-    restart: always
 
   landing-page:
     build:
       context: ./landing-page
       dockerfile: Dockerfile
     container_name: rds-landing
+    restart: always
+    init: true
+    mem_limit: 256M
     environment:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
-    restart: always
 
   nginx:
     image: nginx:stable-alpine
     container_name: gerenciador-nginx
+    restart: always
+    mem_limit: 128M
     ports:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
       - ./data/media:/usr/share/nginx/html/media:ro
       - ./data/static:/usr/share/nginx/html/static:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
       - frontend
       - landing-page
       - redis
-    restart: always
+
