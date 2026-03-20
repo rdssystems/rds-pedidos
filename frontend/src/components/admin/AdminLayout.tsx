@@ -182,9 +182,9 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                         <Menu size={24} />
                     </button>
                     <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0">
-                        <ChefHat size={18} />
+                        {store?.nome?.[0] || 'R'}
                     </div>
-                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase truncate max-w-[150px]">{store?.nome || 'Admin'}</h1>
+                    <h1 className="text-base font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight line-clamp-2 max-w-[200px]">{store?.nome || 'Admin'}</h1>
                 </div>
                 <button
                     onClick={logout}
@@ -222,12 +222,12 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className={`p-6 ${isMinimized ? 'px-4' : 'pb-4 p-8'}`}>
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0 mx-auto">
-                                <ChefHat size={24} />
+                            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0 mx-auto font-black italic">
+                                {store?.nome?.[0] || 'R'}
                             </div>
                             {!isMinimized && (
-                                <div className="flex flex-col overflow-hidden">
-                                    <h1 className="text-xl font-black text-[#0f172a] italic tracking-tighter uppercase leading-none truncate">
+                                <div className="flex flex-col min-w-0">
+                                    <h1 className="text-lg font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight break-words">
                                         {store?.nome || 'Admin'}
                                     </h1>
                                     <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Painel Gestão</span>

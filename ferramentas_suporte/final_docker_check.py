@@ -8,14 +8,14 @@ ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 try:
     ssh.connect('129.121.45.7', port=22022, username='root', password='@Klisman12#')
     
-    print("--- DOCKER CONTAINER PIDs ---")
-    stdin, stdout, stderr = ssh.exec_command("docker ps -q | xargs -n1 docker inspect --format '{{.State.Pid}} {{.Name}}'")
+    print("--- DOCKER PS (STATUS REAL) ---")
+    stdin, stdout, stderr = ssh.exec_command('docker ps --format "table {{.Names}}\t{{.Status}}"')
     print(stdout.read().decode())
     
-    print("--- ZOMBIE PARENT TREE (PPID 227535) ---")
-    stdin, stdout, stderr = ssh.exec_command("ps -fo pid,ppid,user,stat,comm,args -p 227535")
+    print("\n--- DOCKER PS -A (ALL) ---")
+    stdin, stdout, stderr = ssh.exec_command('docker ps -a --format "table {{.Names}}\t{{.Status}}"')
     print(stdout.read().decode())
-
+    
 except Exception as e:
     print(e)
 finally:
