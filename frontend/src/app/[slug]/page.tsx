@@ -369,15 +369,64 @@ export default function PublicMenuPage() {
             {/* Content Layer */}
             <div className="relative z-10">
                 {/* Sticky Header Bar */}
-                <div className={`fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 p-4 transition-all duration-300 flex items-center justify-between ${isScrolled ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-white">
+                <div className={`fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-100 p-3 transition-all duration-500 flex items-center justify-between shadow-sm ${isScrolled ? 'translate-y-0 opacity-100 shadow-xl' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+                    <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-white flex-shrink-0">
                             <img src={getImageUrl(store.logo)} alt={store.nome} className="w-full h-full object-cover" />
                         </div>
-                        <h2 className="font-black italic uppercase tracking-tighter text-gray-900 line-clamp-1">{store.nome}</h2>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <h2 className="font-black italic uppercase tracking-tighter text-gray-900 line-clamp-1 text-sm md:text-base leading-none">{store.nome}</h2>
+                            
+                            {/* Desktop Info Row */}
+                            <div className="hidden lg:flex items-center gap-4 text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                                <div className="flex items-center gap-1.5">
+                                    <Clock size={10} className="text-gray-300" />
+                                    {(() => {
+                                        const now = new Date();
+                                        const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
+                                        if (!h || h.closed) return 'Fechado';
+                                        return `${h.open} - ${h.close}`;
+                                    })()}
+                                </div>
+                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4">
+                                    <Phone size={10} className="text-gray-300" />
+                                    <span>{store.whatsapp}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4">
+                                    <MapPin size={10} className="text-gray-300" />
+                                    <span className="truncate max-w-[200px]">{store.endereco}</span>
+                                </div>
+                            </div>
+
+                            {/* Mobile/Tablet Info Icons */}
+                            <div className="flex lg:hidden items-center gap-2 text-[9px] font-bold text-gray-400">
+                                <span className={isOpenStatus.open ? 'text-green-500' : 'text-red-500'}>{isOpenStatus.label}</span>
+                                <span className="opacity-30">•</span>
+                                <Clock size={10} />
+                                <Phone size={10} />
+                                <MapPin size={10} />
+                            </div>
+                        </div>
                     </div>
-                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${isOpenStatus.open ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                        {isOpenStatus.label}
+
+                    <div className="flex items-center gap-3">
+                        {/* Short Status Badge */}
+                        <div className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${isOpenStatus.open ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                            <div className={`w-1 h-1 rounded-full ${isOpenStatus.open ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+                            {isOpenStatus.label}
+                        </div>
+                        
+                        {/* Quick Cart CTA in Navbar */}
+                        {cart.length > 0 && (
+                            <button
+                                onClick={() => setIsCartOpen(true)}
+                                className="bg-primary text-white p-2.5 rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
+                                style={{ backgroundColor: store.cor_primaria }}
+                            >
+                                <ShoppingBag size={16} />
+                                <span className="text-[10px] font-black">{cart.reduce((s, i) => s + i.quantidade, 0)}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
