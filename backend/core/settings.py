@@ -24,7 +24,15 @@ IFOOD_CLIENT_SECRET = os.getenv('IFOOD_CLIENT_SECRET', '')
 MERCADO_PAGO_PUBLIC_KEY = os.getenv('MERCADO_PAGO_PUBLIC_KEY', '')
 MERCADO_PAGO_ACCESS_TOKEN = os.getenv('MERCADO_PAGO_ACCESS_TOKEN', '')
 
-ALLOWED_HOSTS = ['*', '192.168.100.105', '100.99.87.126', '172.22.240.1', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*', 'rdspedidos.com.br', 'app.rdspedidos.com.br', '129.121.45.7', 'localhost', '127.0.0.1']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://rdspedidos.com.br',
+    'https://www.rdspedidos.com.br',
+    'https://app.rdspedidos.com.br',
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
     'daphne',
