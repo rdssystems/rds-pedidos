@@ -37,3 +37,41 @@ Thumbs.db
 # Project specific
 chave api global.txt
 FIX_STATUS.txt
+production.env
+
+# Debug/deploy scripts (root level)
+check_*.py
+debug_*.py
+deploy_*.py
+test_*.py
+fix_*.py
+grep_*.py
+list_*.py
+upload_*.py
+update_*.py
+rebuild_*.py
+restart_*.py
+run_*.py
+cleanup_*.py
+monitor_*.py
+zombie_*.py
+vps_*.py
+get_*.py
+find_*.py
+map_*.py
+ps_*.py
+deep_*.py
+inspect_*.py
+full_*.py
+ultimate_*.py
+db_inspect.py
+
+# Archives and logs
+*.tar.gz
+*.zip
+*.txt
+!README.txt
+
+# Landing Page copy
+Gerenciador de Pedidos Landing Page/
+Landing Page/
