@@ -84,8 +84,12 @@ export default function RegisterPage() {
                         <CheckCircle2 className="text-white w-10 h-10" />
                     </div>
                     <h2 className="text-3xl font-black text-white mb-2">Sucesso!</h2>
-                    <p className="text-gray-400 mb-6">Sua loja <strong>{storeName}</strong> foi criada. Redirecionando...</p>
-                    <Loader2 className="animate-spin w-8 h-8 text-primary mx-auto" />
+                    <p className="text-gray-400 mb-2">Sua loja <strong>{storeName}</strong> foi criada com sucesso!</p>
+                    <p className="text-primary font-bold mb-6 animate-pulse">Acesse seu e-mail agora para confirmar sua conta e ativar seu acesso.</p>
+                    <div className="flex flex-col items-center gap-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Redirecionando para o painel...</p>
+                        <Loader2 className="animate-spin w-8 h-8 text-primary mx-auto" />
+                    </div>
                 </div>
             </div>
         );
