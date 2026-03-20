@@ -497,25 +497,17 @@ class StoreViewSet(viewsets.ModelViewSet):
         })
 
     def update(self, request, *args, **kwargs):
-        with open('debug_frontend_payload.txt', 'w') as f:
-            f.write(str(dict(request.data)))
-            
         if 'horario_funcionamento' in request.data and isinstance(request.data['horario_funcionamento'], str):
             try:
                 data = request.data.copy()
                 data['horario_funcionamento'] = json.loads(data['horario_funcionamento'])
                 serializer = self.get_serializer(self.get_object(), data=data, partial=kwargs.get('partial', False))
                 serializer.is_valid(raise_exception=True)
-                with open('debug_frontend_payload.txt', 'a') as f:
-                    f.write("\nValid custom: " + str(serializer.validated_data))
                 self.perform_update(serializer)
                 return Response(serializer.data)
-            except json.JSONDecodeError: pass
+            except json.JSONDecodeError:
+                pass
         
-        serializer = self.get_serializer(self.get_object(), data=request.data, partial=kwargs.get('partial', False))
-        serializer.is_valid(raise_exception=True)
-        with open('debug_frontend_payload.txt', 'a') as f:
-            f.write("\nValid super: " + str(serializer.validated_data))
         return super().update(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'], url_path='especialista-financeiro')
