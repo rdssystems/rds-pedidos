@@ -380,10 +380,10 @@ export default function PublicMenuPage() {
                                 {store.nome}
                             </h2>
                             
-                            {/* Info Row - Visible on Medium+ screens */}
-                            <div className="hidden sm:flex items-center gap-4 text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                <div className="flex items-center gap-1.5">
-                                    <Clock size={10} className="text-gray-300" />
+                            {/* Info Row - Desktop: Show Everything Full */}
+                            <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-1">
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <Clock size={12} className="text-primary" style={{ color: store.cor_primaria }} />
                                     {(() => {
                                         const now = new Date();
                                         const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
@@ -391,29 +391,28 @@ export default function PublicMenuPage() {
                                         return `${h.open} - ${h.close}`;
                                     })()}
                                 </div>
-                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4">
-                                    <Phone size={10} className="text-gray-300" />
+                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4 flex-shrink-0">
+                                    <Phone size={12} className="text-primary" style={{ color: store.cor_primaria }} />
                                     <span>{store.whatsapp}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4">
-                                    <MapPin size={10} className="text-gray-300 shrink-0" />
-                                    <span className="truncate max-w-[200px]">{store.endereco}</span>
+                                <div className="flex items-center gap-1.5 border-l border-gray-100 pl-4 min-w-0 max-w-sm lg:max-w-md overflow-hidden">
+                                    <MapPin size={12} className="text-primary shrink-0" style={{ color: store.cor_primaria }} />
+                                    <span className="whitespace-nowrap" title={store.endereco}>{store.endereco}</span>
                                 </div>
                             </div>
 
-                            {/* Mobile Info Badges - Visible on tiny screens */}
-                            <div className="flex sm:hidden items-center gap-2 text-[8px] font-black uppercase tracking-tighter">
-                                <span className={isOpenStatus.open ? 'text-green-500' : 'text-red-500'}>{isOpenStatus.label}</span>
-                                <span className="opacity-30">|</span>
-                                <div className="flex items-center gap-1 text-gray-400">
-                                    <Clock size={8} />
-                                    {(() => {
-                                        const now = new Date();
-                                        const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
-                                        if (!h || h.closed) return 'Fechado';
-                                        return h.open;
-                                    })()}
-                                </div>
+                            {/* Mobile Details Trigger - Visible on small screens */}
+                            <div className="lg:hidden flex items-center gap-3 mt-0.5">
+                                <button
+                                    onClick={() => {
+                                        const el = document.getElementById('store-mobile-info');
+                                        if (el) el.classList.toggle('hidden');
+                                    }}
+                                    className="text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100"
+                                    style={{ color: store.cor_primaria }}
+                                >
+                                    + Ver Infos <ChevronRight size={10} />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -439,15 +438,51 @@ export default function PublicMenuPage() {
                     </div>
                 </div>
 
+                {/* Mobile Info Overlay (Hidden by default) */}
+                <div id="store-mobile-info" className="fixed top-[64px] left-0 right-0 z-[49] bg-white/95 backdrop-blur-xl border-b border-gray-100 p-6 flex flex-col gap-4 shadow-2xl hidden animate-slide-down">
+                    <div className="flex items-center justify-between">
+                         <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Dados da Loja</h3>
+                         <button onClick={() => document.getElementById('store-mobile-info')?.classList.add('hidden')} className="text-gray-300"><X size={20} /></button>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4 text-sm font-bold text-gray-800">
+                             <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-primary" style={{ color: store.cor_primaria }}><Clock size={16} /></div>
+                             <div className="flex flex-col">
+                                 <span className="text-[9px] uppercase tracking-widest opacity-40">Horário</span>
+                                 <span>{(() => {
+                                        const now = new Date();
+                                        const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
+                                        if (!h || h.closed) return 'Fechado hoje';
+                                        return `${h.open} - ${h.close}`;
+                                    })()}</span>
+                             </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm font-bold text-gray-800">
+                             <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-primary" style={{ color: store.cor_primaria }}><Phone size={16} /></div>
+                             <div className="flex flex-col">
+                                 <span className="text-[9px] uppercase tracking-widest opacity-40">WhatsApp</span>
+                                 <span>{store.whatsapp}</span>
+                             </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm font-bold text-gray-800">
+                             <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-primary" style={{ color: store.cor_primaria }}><MapPin size={16} /></div>
+                             <div className="flex flex-col">
+                                 <span className="text-[9px] uppercase tracking-widest opacity-40">Endereço</span>
+                                 <span className="leading-tight">{store.endereco}</span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Header Area */}
                 <header className="relative w-full">
                     {/* Banner Area - SPACER ONLY */}
-                    <div className="h-20 md:h-32 w-full relative overflow-hidden" />
+                    <div className="h-24 md:h-32 w-full relative overflow-hidden" />
 
                     {/* Overlapping Identity Area */}
                     <div className="relative -mt-10 px-6 flex flex-col items-center z-20">
                         {/* Smaller Logo in Hero to avoid duplicate focus */}
-                        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden">
+                        <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-white shadow-2xl bg-white overflow-hidden">
                             {store.logo ? (
                                 <img src={getImageUrl(store.logo)} alt={store.nome} className="w-full h-full object-cover" />
                             ) : (
@@ -457,64 +492,11 @@ export default function PublicMenuPage() {
                             )}
                         </div>
 
-                        {/* Store Title - Big & Impactful */}
+                        {/* Store Title - Clean & Centered */}
                         <div className="mt-6 text-center space-y-4 animate-slide-up w-full max-w-2xl flex flex-col items-center">
                             <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase leading-none text-gray-900 drop-shadow-sm bg-white/60 backdrop-blur-md py-4 px-8 rounded-3xl inline-block shadow-sm">
                                 {store.nome}
                             </h1>
-
-                            {/* Metadata Row */}
-                            <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-sm font-bold text-gray-700 bg-white/60 backdrop-blur-md py-3 px-6 rounded-2xl inline-flex self-center shadow-sm">
-                                {/* Status Badge */}
-                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isOpenStatus.open ? 'bg-green-500 text-white' : 'bg-red-500 text-white'} shadow-sm`}>
-                                    <div className={`w-1.5 h-1.5 rounded-full bg-white animate-pulse`} />
-                                    {isOpenStatus.label}
-                                </div>
-
-                                {/* Current Hours */}
-                                <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
-                                    <Clock size={14} className="text-gray-500" />
-                                    {(() => {
-                                        const now = new Date();
-                                        const h = store.horario_funcionamento?.[DIAS_MAP[now.getDay()]];
-                                        if (!h) return 'Horário não definido';
-                                        if (typeof h === 'string') return h; // Legacy support
-                                        if (h.closed) return 'Fechado hoje';
-                                        return `${h.open} - ${h.close}`;
-                                    })()}
-                                </div>
-
-                                {/* Phone (Hidden on small screens) */}
-                                {store.whatsapp && (
-                                    <div className="hidden md:flex items-center gap-2 text-xs uppercase tracking-wider border-l border-gray-300 pl-4">
-                                        <Phone size={14} className="text-gray-500" />
-                                        <span>{store.whatsapp}</span>
-                                    </div>
-                                )}
-
-                                {/* Address (Hidden on small screens) */}
-                                {store.endereco && (
-                                    <div className="hidden md:flex items-center gap-2 text-xs uppercase tracking-wider border-l border-gray-300 pl-4">
-                                        <MapPin size={14} className="text-gray-500 flex-shrink-0" />
-                                        <span className="truncate max-w-[350px]" title={store.endereco}>{store.endereco}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Mobile Info (Separate line) */}
-                            <div className="md:hidden flex flex-col items-center gap-2 mt-3 w-full max-w-sm">
-                                {store.whatsapp && (
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 bg-white/50 backdrop-blur-sm py-1.5 px-3 rounded-full shadow-sm">
-                                        <Phone size={12} className="text-gray-500" /> {store.whatsapp}
-                                    </p>
-                                )}
-                                {store.endereco && (
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2 text-center bg-white/50 backdrop-blur-sm py-2 px-4 rounded-xl shadow-sm w-full mx-4">
-                                        <MapPin size={12} className="flex-shrink-0 text-gray-500" />
-                                        <span className="line-clamp-2">{store.endereco}</span>
-                                    </p>
-                                )}
-                            </div>
                         </div>
                     </div>
                 </header>
