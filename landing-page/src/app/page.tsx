@@ -383,7 +383,7 @@ export default function LandingPage() {
             <p className="text-lg text-slate-400">Sem taxas sobre vendas. Sem surpresas no fim do mês. Escolha o ideal para o seu Delivery.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
 
             {/* Plan Start */}
             <div className="bg-slate-800/50 backdrop-blur-xl rounded-[2.5rem] p-10 border border-slate-700">
@@ -427,40 +427,16 @@ export default function LandingPage() {
                 <li className="flex items-center gap-3 font-bold"><Check className="text-red-500" size={20} strokeWidth={3} /> Tudo do plano Start</li>
                 <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Painel Kanban</li>
                 <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Gestão de Mesas e Comandas</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Especialista Financeiro com IA <Zap size={16} fill="currentColor" className="text-yellow-500" /></li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 3 Contas de Equipe</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 200 Produtos</li>
-                <li className="flex items-center gap-3 text-slate-400 line-through"><Check size={20} /> Integração iFood</li>
+                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Robô de WhatsApp com Google Gemini <Zap size={16} fill="currentColor" className="text-yellow-500" /></li>
+                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Especialista Financeiro com IA</li>
+                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 10 Contas de Equipe</li>
+                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 1000 Produtos</li>
+                <li className="flex items-center gap-3 text-slate-400"><Check size={20} /> Integração iFood (Em breve)</li>
               </ul>
               <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-4 rounded-full font-black text-white bg-red-500 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/40 transition-all active:scale-95 text-lg">
                 Assinar o PRO
               </a>
               <p className="text-center text-xs text-slate-500 font-bold mt-4 uppercase tracking-wider">7 Dias de Teste Grátis no PRO</p>
-            </div>
-
-            {/* Plan ELITE */}
-            <div className="bg-slate-800/50 backdrop-blur-xl rounded-[2.5rem] p-10 border border-slate-700">
-              <div className="mb-6">
-                <span className="text-sm font-bold tracking-widest uppercase text-slate-400">Premium</span>
-                <h3 className="text-3xl font-black text-white mt-2">Elite</h3>
-              </div>
-              <div className="mb-8 flex items-end gap-2">
-                <span className="text-slate-400 text-lg font-bold mb-1 mr-1">R$</span>
-                <span className="text-5xl font-black text-white tracking-tighter">199<span className="text-3xl">,90</span></span>
-                <span className="text-slate-400 font-bold mb-1 pl-1">/mês</span>
-              </div>
-              <ul className="space-y-4 mb-10 text-slate-300">
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Tudo do plano PRO + IA</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Robô de WhatsApp com Google Gemini <Zap size={16} fill="currentColor" className="text-yellow-500" /></li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Integração iFood (Em Breve)</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Até 10 Contas de Equipe</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Até 1000 Produtos</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Relatórios Financeiros Avançados</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-red-400" size={20} /> Suporte Prioritário</li>
-              </ul>
-              <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-4 rounded-full font-bold text-white bg-slate-700 hover:bg-slate-600 transition-colors">
-                Ser ELITE
-              </a>
             </div>
 
           </div>

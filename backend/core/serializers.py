@@ -169,8 +169,16 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
             'categorias', 'bairros_entrega',
             'bot_ativo_whatsapp', 'bot_personalidade', 'bot_conhecimento', 'bot_alerta_transbordo',
-            'modo_catalogo', 'quantidade_mesas'
+            'modo_catalogo', 'quantidade_mesas', 'caixa_aberto'
         ]
+
+    caixa_aberto = serializers.SerializerMethodField()
+
+    def get_caixa_aberto(self, obj):
+        # We need to import Caixa here to avoid circular imports if any, 
+        # though it's already imported at the top.
+        from .models import Caixa
+        return Caixa.objects.filter(loja=obj, status='ABERTO').exists()
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
     produto_obj = ProdutoSerializer(source='produto', read_only=True)

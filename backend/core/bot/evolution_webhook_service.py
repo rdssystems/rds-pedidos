@@ -42,8 +42,8 @@ class EvolutionWebhookService:
             if not loja:
                 return False
                 
-            # Verificar se a loja tem o bot ativo e se está no plano Elite
-            if not loja.bot_ativo_whatsapp or loja.plano_tipo != 'ELITE':
+            # Verificar se a loja tem o bot ativo e se está no plano Pro
+            if not loja.bot_ativo_whatsapp or loja.plano_tipo != 'PRO':
                 return False
                 
             # TODO: Lógica de "Transbordo"/Handoff (Pause state)

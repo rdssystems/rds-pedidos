@@ -27,14 +27,8 @@ try:
         {
             'nome': 'Pro',
             'preco_mensal': 129.90, 
-            'max_produtos': 200,
-            'recursos': {'whatsapp': True, 'cardapio_digital': True, 'pedidos': True, 'pdv': True, 'kanban': True, 'mesas': True, 'equipe': 3}
-        },
-        {
-            'nome': 'Elite',
-            'preco_mensal': 249.90, 
             'max_produtos': 1000,
-            'recursos': {'whatsapp': True, 'cardapio_digital': True, 'pedidos': True, 'pdv': True, 'kanban': True, 'mesas': True, 'equipe': 10, 'ifood': True}
+            'recursos': {'whatsapp': True, 'whatsapp_automation': True, 'cardapio_digital': True, 'pedidos': True, 'pdv': True, 'kanban': True, 'mesas': True, 'equipe': 10, 'ifood': True}
         }
     ]
     

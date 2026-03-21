@@ -43,3 +43,12 @@ class OrderConsumer(AsyncWebsocketConsumer):
             'type': 'stock_update',
             'message': message
         }))
+
+    async def caixa_notification(self, event):
+        message = event['message']
+
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'caixa_update',
+            'message': message
+        }))

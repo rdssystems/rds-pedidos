@@ -66,8 +66,10 @@ def notify_order_change(sender, instance, created, **kwargs):
     if not created and instance.cliente_whatsapp and instance.loja.evolution_instance:
         # Check if the plan allows WhatsApp automation
         recursos = instance.loja.plano.recursos if instance.loja.plano else {}
-        if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation'):
-            logger.info(f"WhatsApp automation disabled for plan {instance.loja.plano.nome if instance.loja.plano else 'None'}")
+        is_trial = instance.loja.status_assinatura == 'trial'
+        
+        if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation') and not is_trial:
+            logger.info(f"WhatsApp automation disabled for plan {instance.loja.plano.nome if instance.loja.plano else 'None'} (Status: {instance.loja.status_assinatura})")
             return
 
         msg = None
@@ -88,7 +90,17 @@ def notify_order_change(sender, instance, created, **kwargs):
              msg = instance.loja.msg_finalizado.format(**context)
 
         if msg:
-            send_whatsapp_message(instance.cliente_whatsapp, msg, instance.loja.evolution_instance)
+            try:
+                logger.info(f"Iniciando envio de mensagem via Evolution para {instance.cliente_whatsapp}...")
+                # Chamada corrigida: (number, message, instance_name)
+                EvolutionService().send_message(
+                    instance.cliente_whatsapp,
+                    msg,
+                    instance.loja.evolution_instance
+                )
+                logger.info("Chamada para send_whatsapp_message concluída.")
+            except Exception as e:
+                logger.error(f"Erro ao chamar send_whatsapp_message: {e}")
 
 from django.contrib.auth.models import User
 from .models import Produto, ConfiguracaoLoja, Plano, UserProfile
@@ -143,3 +155,27 @@ def notify_stock_change(sender, instance, created, **kwargs):
         )
     except Exception as e:
         logger.error(f"Error sending stock update: {e}")
+
+from .models import Caixa
+
+@receiver(post_save, sender=Caixa)
+def notify_caixa_change(sender, instance, created, **kwargs):
+    channel_layer = get_channel_layer()
+    
+    # Message to send to the group
+    message = {
+        'id': instance.id,
+        'status': instance.status,
+        'type': 'CAIXA_UPDATE'
+    }
+    
+    # Send to specific store group
+    group_name = f"store_{instance.loja.id}"
+    
+    async_to_sync(channel_layer.group_send)(
+        group_name,
+        {
+            "type": "caixa_notification",
+            "message": message
+        }
+    )

@@ -72,7 +72,6 @@ class ConfiguracaoLoja(models.Model):
     PLANO_CHOICES = [
         ('START', 'Plano Start'),
         ('PRO', 'Plano Pro'),
-        ('ELITE', 'Plano Elite'),
     ]
     plano_tipo = models.CharField(max_length=20, choices=PLANO_CHOICES, default='START')
     plano = models.ForeignKey(Plano, on_delete=models.SET_NULL, null=True, blank=True)

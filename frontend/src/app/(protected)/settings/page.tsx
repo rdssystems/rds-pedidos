@@ -818,112 +818,171 @@ export default function StoreSettings() {
                             </div>
 
                             <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-2">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Passo 1: Quantidade de Mesas</label>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                    {modoCatalogo ? 'Passo 1: Gerar QR do Cardápio' : 'Passo 1: Quantidade de Mesas'}
+                                </label>
                                 <div className="flex items-center gap-3">
-                                    <div className="flex-1">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={quantidadeMesas}
-                                            onChange={(e) => {
-                                                setQuantidadeMesas(parseInt(e.target.value) || 0);
-                                            }}
-                                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold"
-                                        />
-                                    </div>
+                                    {!modoCatalogo && (
+                                        <div className="flex-1">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={quantidadeMesas}
+                                                onChange={(e) => {
+                                                    setQuantidadeMesas(parseInt(e.target.value) || 0);
+                                                }}
+                                                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold"
+                                            />
+                                        </div>
+                                    )}
                                     <button
                                         onClick={() => setShowQRs(true)}
-                                        disabled={quantidadeMesas <= 0}
-                                        className="bg-indigo-500 text-white px-6 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-indigo-600 transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+                                        disabled={!modoCatalogo && quantidadeMesas <= 0}
+                                        className="bg-indigo-500 text-white px-6 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-indigo-600 transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex-1"
                                     >
-                                        Gerar QR Codes
+                                        {modoCatalogo ? 'Gerar QR Único' : 'Gerar QR das Mesas'}
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {showQRs && quantidadeMesas > 0 && (
+                        {showQRs && (
                             <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 space-y-6 animate-slide-up print:bg-white print:border-none print:p-0">
                                 <div className="flex items-center justify-between print:hidden">
-                                    <h3 className="font-black text-indigo-900 uppercase italic tracking-tighter">QR Codes Gerados</h3>
+                                    <h3 className="font-black text-indigo-900 uppercase italic tracking-tighter">
+                                        {modoCatalogo ? 'QR Code do Cardápio Digital' : 'QR Codes das Mesas'}
+                                    </h3>
                                     <button 
                                         onClick={() => window.print()}
                                         className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-50 transition-colors shadow-sm"
                                     >
-                                        Imprimir Todos
+                                        Imprimir {modoCatalogo ? 'QR' : 'Todos'}
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 print:grid-cols-2 print:gap-10">
-                                    {Array.from({ length: quantidadeMesas }, (_, i) => i + 1).map((mesa) => {
-                                        const url = typeof window !== 'undefined' ? `${window.location.origin}/${storeSlug}?mesa=${mesa}` : `/${storeSlug}?mesa=${mesa}`;
-                                        const qrId = `qr-mesa-${mesa}`;
-                                        
-                                        const downloadQR = () => {
-                                            const svg = document.getElementById(qrId);
-                                            if (!svg) return;
-                                            const svgData = new XMLSerializer().serializeToString(svg);
-                                            const canvas = document.createElement("canvas");
-                                            const ctx = canvas.getContext("2d");
-                                            const img = new Image();
-                                            img.onload = () => {
-                                                canvas.width = 1000;
-                                                canvas.height = 1000;
-                                                ctx!.fillStyle = "white";
-                                                ctx!.fillRect(0, 0, canvas.width, canvas.height);
-                                                ctx!.drawImage(img, 50, 50, 900, 900);
-                                                
-                                                // Add label to image
-                                                ctx!.fillStyle = "black";
-                                                ctx!.font = "bold 60px Arial";
-                                                ctx!.textAlign = "center";
-                                                ctx!.fillText(`MESA ${mesa} - ${storeName}`, 500, 950);
-
-                                                const pngFile = canvas.toDataURL("image/png");
-                                                const downloadLink = document.createElement("a");
-                                                downloadLink.download = `QR_MESA_${mesa}_${storeSlug}.png`;
-                                                downloadLink.href = pngFile;
-                                                downloadLink.click();
-                                            };
-                                            img.src = "data:image/svg+xml;base64," + btoa(svgData);
-                                        };
-
-                                        return (
-                                            <div key={mesa} className="bg-white p-6 rounded-[2rem] shadow-sm border border-indigo-100 flex flex-col items-center gap-4 group transition-all print:shadow-none print:border-2 print:border-gray-200">
-                                                <div className="bg-white p-4 rounded-2xl border border-gray-50 group-hover:border-indigo-200 transition-colors">
-                                                    <QRCode 
-                                                        id={qrId}
-                                                        value={url}
-                                                        size={200}
-                                                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                                        viewBox={`0 0 256 256`}
-                                                    />
-                                                </div>
-                                                <div className="text-center">
-                                                    <span className="font-black text-indigo-900 text-lg uppercase italic block">MESA {mesa}</span>
-                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{storeSlug}</span>
-                                                </div>
-                                                
-                                                <div className="flex gap-2 w-full print:hidden">
-                                                    <button 
-                                                        onClick={downloadQR}
-                                                        className="flex-1 bg-gray-50 hover:bg-indigo-50 text-indigo-600 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
-                                                    >
-                                                        Salvar Imagem
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(url);
-                                                            alert(`Link da Mesa ${mesa} copiado!`);
-                                                        }}
-                                                        className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
-                                                    >
-                                                        Copiar Link
-                                                    </button>
-                                                </div>
+                                    {modoCatalogo ? (
+                                        /* Single QR for Catalog Mode */
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-indigo-100 flex flex-col items-center gap-4 group transition-all print:shadow-none print:border-2 print:border-gray-200 mx-auto col-span-full max-w-sm">
+                                            <div className="bg-white p-4 rounded-2xl border border-gray-50 group-hover:border-indigo-200 transition-colors">
+                                                <QRCode 
+                                                    id="qr-catalogo-unico"
+                                                    value={typeof window !== 'undefined' ? `${window.location.origin}/${storeSlug}?mesa=0` : `/${storeSlug}?mesa=0`}
+                                                    size={250}
+                                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                                    viewBox={`0 0 256 256`}
+                                                />
                                             </div>
-                                        );
-                                    })}
+                                            <div className="text-center">
+                                                <span className="font-black text-indigo-900 text-lg uppercase italic block leading-tight">Cardápio Digital</span>
+                                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Exiba este código em todas as mesas</span>
+                                            </div>
+                                            
+                                            <div className="flex gap-2 w-full print:hidden">
+                                                <button 
+                                                    onClick={() => {
+                                                        const svg = document.getElementById('qr-catalogo-unico');
+                                                        if (!svg) return;
+                                                        const svgData = new XMLSerializer().serializeToString(svg);
+                                                        const canvas = document.createElement("canvas");
+                                                        const ctx = canvas.getContext("2d");
+                                                        const img = new Image();
+                                                        img.onload = () => {
+                                                            canvas.width = 1000;
+                                                            canvas.height = 1000;
+                                                            ctx!.fillStyle = "white";
+                                                            ctx!.fillRect(0, 0, canvas.width, canvas.height);
+                                                            ctx!.drawImage(img, 50, 50, 900, 900);
+                                                            ctx!.fillStyle = "black";
+                                                            ctx!.font = "bold 60px Arial";
+                                                            ctx!.textAlign = "center";
+                                                            ctx!.fillText(`CARDÁPIO DIGITAL - ${storeName}`, 500, 950);
+                                                            const pngFile = canvas.toDataURL("image/png");
+                                                            const downloadLink = document.createElement("a");
+                                                            downloadLink.download = `QR_CARDAPIO_${storeSlug}.png`;
+                                                            downloadLink.href = pngFile;
+                                                            downloadLink.click();
+                                                        };
+                                                        img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                                                    }}
+                                                    className="flex-1 bg-gray-50 hover:bg-indigo-50 text-indigo-600 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
+                                                >
+                                                    Salvar Imagem
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* Multiple QRs for Order Mode */
+                                        Array.from({ length: quantidadeMesas }, (_, i) => i + 1).map((mesa) => {
+                                            const url = typeof window !== 'undefined' ? `${window.location.origin}/${storeSlug}?mesa=${mesa}` : `/${storeSlug}?mesa=${mesa}`;
+                                            const qrId = `qr-mesa-${mesa}`;
+                                            
+                                            const downloadQR = () => {
+                                                const svg = document.getElementById(qrId);
+                                                if (!svg) return;
+                                                const svgData = new XMLSerializer().serializeToString(svg);
+                                                const canvas = document.createElement("canvas");
+                                                const ctx = canvas.getContext("2d");
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    canvas.width = 1000;
+                                                    canvas.height = 1000;
+                                                    ctx!.fillStyle = "white";
+                                                    ctx!.fillRect(0, 0, canvas.width, canvas.height);
+                                                    ctx!.drawImage(img, 50, 50, 900, 900);
+                                                    
+                                                    // Add label to image
+                                                    ctx!.fillStyle = "black";
+                                                    ctx!.font = "bold 60px Arial";
+                                                    ctx!.textAlign = "center";
+                                                    ctx!.fillText(`MESA ${mesa} - ${storeName}`, 500, 950);
+
+                                                    const pngFile = canvas.toDataURL("image/png");
+                                                    const downloadLink = document.createElement("a");
+                                                    downloadLink.download = `QR_MESA_${mesa}_${storeSlug}.png`;
+                                                    downloadLink.href = pngFile;
+                                                    downloadLink.click();
+                                                };
+                                                img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                                            };
+
+                                            return (
+                                                <div key={mesa} className="bg-white p-6 rounded-[2rem] shadow-sm border border-indigo-100 flex flex-col items-center gap-4 group transition-all print:shadow-none print:border-2 print:border-gray-200">
+                                                    <div className="bg-white p-4 rounded-2xl border border-gray-50 group-hover:border-indigo-200 transition-colors">
+                                                        <QRCode 
+                                                            id={qrId}
+                                                            value={url}
+                                                            size={200}
+                                                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                                            viewBox={`0 0 256 256`}
+                                                        />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <span className="font-black text-indigo-900 text-lg uppercase italic block">MESA {mesa}</span>
+                                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{storeSlug}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-2 w-full print:hidden">
+                                                        <button 
+                                                            onClick={downloadQR}
+                                                            className="flex-1 bg-gray-50 hover:bg-indigo-50 text-indigo-600 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
+                                                        >
+                                                            Salvar Imagem
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(url);
+                                                                alert(`Link da Mesa ${mesa} copiado!`);
+                                                            }}
+                                                            className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-100 transition-colors"
+                                                        >
+                                                            Copiar Link
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
                         )}

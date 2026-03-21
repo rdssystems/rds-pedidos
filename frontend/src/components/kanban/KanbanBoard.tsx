@@ -299,7 +299,10 @@ export const KanbanBoard = () => {
             nextStatus = 'FINALIZADO';
         }
 
-        if (!nextStatus) return;
+        if (nextStatus === 'FINALIZADO' && pedido.tipo === 'MESA') {
+            alert('Pedidos de mesa são finalizados apenas no caixa ao fechar a compra do cliente.');
+            return;
+        }
 
         try {
             const token = localStorage.getItem('token');
@@ -356,6 +359,11 @@ export const KanbanBoard = () => {
 
         const pedido = pedidos.find(p => p.id === pedidoId);
         if (!pedido || pedido.status === colId) return;
+
+        if (colId === 'FINALIZADO' && pedido.tipo === 'MESA') {
+            alert('Pedidos de mesa são finalizados apenas no caixa ao fechar a compra do cliente.');
+            return;
+        }
 
         // Optimistic UI update
         const previousPedidos = [...pedidos];

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useSocket } from './SocketContext';
+import { useBilling } from './BillingContext';
 
 // Types
 interface Caixa {
@@ -48,6 +49,7 @@ const PosContext = createContext<PosContextType>({} as PosContextType);
 export const PosProvider = ({ children }: { children: React.ReactNode }) => {
     const [caixa, setCaixa] = useState<Caixa | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { refreshBilling } = useBilling();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [products, setProducts] = useState<any[]>([]);
     const [activeMesaOrders, setActiveMesaOrders] = useState<number[]>([]);
@@ -323,6 +325,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         setActiveMesaNum(null);
         clearCart();
         await fetchCaixa();
+        refreshBilling();
         return data;
     };
 
@@ -426,6 +429,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
 
         const data = await res.json();
         clearCart();
+        refreshBilling();
         return data;
     };
 

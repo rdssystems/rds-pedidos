@@ -10,9 +10,12 @@ import {
 } from 'lucide-react';
 import { ProductModal } from '@/components/Menu/ProductModal';
 import { useBilling } from '@/context/BillingContext';
+import { useSocket } from '@/context/SocketContext';
 
 const TableDetailPage = () => {
     const { user, loading } = useAuth();
+    const { store, refreshBilling } = useBilling();
+    const { lastMessage } = useSocket();
     const router = useRouter();
     const params = useParams();
     const mesaNum = params.id;
@@ -29,7 +32,6 @@ const TableDetailPage = () => {
     // Product Modal State
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const { store } = useBilling();
 
     const fetchTableData = async () => {
         setIsLoading(true);
@@ -65,9 +67,15 @@ const TableDetailPage = () => {
     };
 
     useEffect(() => {
-        if (!loading && !user) router.push('/login');
         if (mesaNum) fetchTableData();
     }, [user, loading, mesaNum]);
+
+    // Listen for real-time status updates
+    useEffect(() => {
+        if (lastMessage && lastMessage.type === 'CAIXA_UPDATE') {
+            refreshBilling();
+        }
+    }, [lastMessage]);
 
     const addToCart = (product: any) => {
         // This is called from the ProductModal handleConfirm
@@ -184,6 +192,12 @@ const TableDetailPage = () => {
                 </div>
             </header>
 
+            {store && store.caixa_aberto === false && (
+                <div className="bg-red-500 text-white px-6 py-2 text-center text-[10px] font-black uppercase tracking-widest animate-pulse">
+                    O Caixa está fechado. Não é possível realizar novos pedidos.
+                </div>
+            )}
+
             <main className="p-6 space-y-8 max-w-4xl mx-auto">
                 {/* Active Orders List */}
                 {orders.length > 0 && (
@@ -244,7 +258,8 @@ const TableDetailPage = () => {
                                             <button
                                                 key={product.id}
                                                 onClick={() => openProductModal(product)}
-                                                className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center gap-2 text-center active:scale-[0.98] transition-all hover:border-primary/20 h-full"
+                                                disabled={store?.caixa_aberto === false}
+                                                className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center gap-2 text-center active:scale-[0.98] transition-all hover:border-primary/20 h-full disabled:opacity-50 disabled:grayscale"
                                             >
                                                 <div className="w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
                                                     {product.imagem ? (
@@ -306,7 +321,7 @@ const TableDetailPage = () => {
 
                             <button
                                 onClick={handleSendToKitchen}
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || store?.caixa_aberto === false}
                                 className="w-full bg-primary hover:bg-orange-600 disabled:opacity-50 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-primary/20"
                             >
                                 {isSubmitting ? (

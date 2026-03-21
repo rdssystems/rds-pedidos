@@ -46,7 +46,7 @@ const plans = [
         id: 'pro',
         name: 'Pro',
         price: '129,90',
-        description: 'O plano perfeito para restaurantes que buscam automação real.',
+        description: 'Potência total com automação e IA para restaurantes.',
         icon: <Zap className="text-red-500" size={24} />,
         color: 'red',
         popular: true,
@@ -55,36 +55,16 @@ const plans = [
             'Gestão de Pedidos (Kanban)',
             'Mesas e Comandas',
             'Integração iFood Oficial (Em breve)',
-            'WhatsApp Bot (Automação)',
-            'Relatórios de Vendas',
-            '3 Contas de Equipe',
-            'Suporte Prioritário WhatsApp'
-        ],
-        notIncluded: [
-            'Gestão de Estoque Avançada',
-            'Módulo Multi-lojas'
-        ],
-        buttonText: 'Assinar Pro',
-        badge: 'Mais Vendido'
-    },
-    {
-        id: 'elite',
-        name: 'Elite',
-        price: '199,90',
-        description: 'Potência total para grandes redes e franquias.',
-        icon: <Crown className="text-amber-500" size={24} />,
-        color: 'amber',
-        features: [
-            'Tudo do Plano Pro',
-            'Módulo Multi-lojas',
-            'Gestão de Estoque Avançada',
             'Atendente de I.A no WhatsApp',
             'Dashboard de BI (Analytics)',
-            'Usuários Ilimitados',
-            'Gerente de Conta Exclusivo'
+            'Módulo Multi-lojas',
+            'Gestão de Estoque Avançada',
+            'Até 10 Contas de Equipe',
+            'Até 1000 Produtos',
+            'Suporte Prioritário WhatsApp'
         ],
         notIncluded: [],
-        buttonText: 'Seja Elite',
+        buttonText: 'Assinar Pro',
         badge: 'Completo'
     }
 ];
@@ -155,7 +135,7 @@ export default function PlansPage() {
                 </p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 max-w-4xl mx-auto">
                 {plans.map((plan) => (
                     <div
                         key={plan.id}

@@ -224,7 +224,11 @@ class StoreViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.action in ['list', 'update', 'partial_update', 'destroy']:
             if self.request.user.is_authenticated:
-                return ConfiguracaoLoja.objects.filter(Q(owner=self.request.user) | Q(equipe__user=self.request.user)).distinct()
+                qs = ConfiguracaoLoja.objects.filter(Q(owner=self.request.user) | Q(equipe__user=self.request.user)).distinct()
+                print(f"DEBUG: User={self.request.user.username}, Stores Found={qs.count()}", flush=True)
+                for s in qs:
+                    print(f"  - Store: {s.slug}, Status: {s.status_assinatura}, Plan: {s.plano_tipo}", flush=True)
+                return qs
             return ConfiguracaoLoja.objects.none()
         return ConfiguracaoLoja.objects.all()
 
@@ -386,16 +390,15 @@ class StoreViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='mp-create-subscription')
     def mp_create_subscription(self, request, slug=None):
         store = self.get_object()
-        plan_type = request.data.get('plan_type') # 'START', 'PRO', 'ELITE'
+        plan_type = request.data.get('plan_type') # 'START', 'PRO'
         
-        if plan_type not in ['START', 'PRO', 'ELITE']:
-            return Response({"error": "Plano inválido."}, status=400)
+        if plan_type not in ['START', 'PRO']:
+            return Response({'error': 'Tipo de plano inválido.'}, status=400)
             
         # Preços definidos na nossa conversa estratégica
         prices = {
             'START': 49.90,
-            'PRO': 129.90,
-            'ELITE': 199.90
+            'PRO': 129.90
         }
         
         service = MercadoPagoService()
@@ -515,9 +518,9 @@ class StoreViewSet(viewsets.ModelViewSet):
         loja = self.get_object()
         
         # Restriction: PRO/ELITE
-        if loja.plano_tipo not in ['PRO', 'ELITE']:
+        if loja.plano_tipo != 'PRO':
             return Response({
-                'error': 'Especialista em Finanças está disponível apenas nos planos PRO e ELITE.',
+                'error': 'Integração iFood disponível apenas no plano PRO.',
                 'upgrade_required': True
             }, status=status.HTTP_403_FORBIDDEN)
         
@@ -902,6 +905,12 @@ class CaixaViewSet(viewsets.ModelViewSet):
         if caixa.status != 'ABERTO':
             return Response({'error': 'Caixa já está fechado.'}, status=400)
 
+        # Restriction: Block if there are ANY pending orders (NOVO, PREPARO, DESPACHADO)
+        # We exclude FINALIZADO and CANCELADO
+        pending_orders = Pedido.objects.filter(loja=caixa.loja).exclude(status__in=['FINALIZADO', 'CANCELADO']).count()
+        if pending_orders > 0:
+            return Response({'error': f'Não é possível fechar o caixa. Existem {pending_orders} pedidos pendentes.'}, status=400)
+
         saldo_informado = request.data.get('saldo_final')
         if saldo_informado is None:
              return Response({'error': 'saldo_final is required'}, status=400)
@@ -925,7 +934,7 @@ class CaixaViewSet(viewsets.ModelViewSet):
 
         # Gemini AI Financial Report (PRO/ELITE)
         relatorio_ia = None
-        if caixa.loja.plano_tipo in ['PRO', 'ELITE']:
+        if caixa.loja.plano_tipo == 'PRO':
             try:
                 ai_service = GeminiService()
                 relatorio_ia = ai_service.get_financial_report(caixa.id)

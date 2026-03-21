@@ -2,6 +2,9 @@ import requests
 import json
 from django.conf import settings
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class EvolutionService:
     def __init__(self):
@@ -80,16 +83,40 @@ class EvolutionService:
         except Exception as e:
             return {"error": str(e)}
 
-    def send_message(self, instance_name, number, text):
-        url = f"{self.base_url}/message/sendText/{instance_name}"
+    def send_message(self, number, message, instance_name, options=None):
+        if not options:
+            options = {}
+        
+        # Sanitize number: remove non-digits and ensure country code
+        clean_number = "".join(filter(str.isdigit, str(number)))
+        if len(clean_number) <= 11 and not clean_number.startswith('55'):
+            clean_number = f"55{clean_number}"
+            
+        endpoint = f"{self.base_url}/message/sendText/{instance_name}"
+        
+        # Using both 'text' and 'textMessage' for maximum compatibility
         payload = {
-            "number": number,
-            "text": text,
-            "delay": 1200,
-            "linkPreview": False
+            "number": clean_number,
+            "text": message,
+            "textMessage": {
+                "text": message
+            },
+            "options": {
+                "delay": options.get('delay', 1200),
+                "presence": options.get('presence', "composing"),
+                "linkPreview": options.get('linkPreview', False)
+            }
         }
+        
         try:
-            response = requests.post(url, headers=self.headers, json=payload, timeout=10)
+            logger.info(f"Enviando mensagem WhatsApp para {clean_number} na instância {instance_name}")
+            response = requests.post(endpoint, json=payload, headers=self.headers, timeout=10)
+            
+            if response.status_code >= 400:
+                logger.error(f"Erro Evolution API ({response.status_code}): {response.text}")
+                return {"status": "error", "error": response.text}
+                
             return response.json()
         except Exception as e:
-            return {"error": str(e)}
+            logger.error(f"Falha ao conectar com Evolution API: {e}")
+            return {"status": "error", "error": str(e)}

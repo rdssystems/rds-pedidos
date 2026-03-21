@@ -26,6 +26,8 @@ interface Store {
     categorias?: any[];
     modo_catalogo?: boolean;
     quantidade_mesas?: number;
+    caixa_aberto?: boolean;
+    pedidos_pendentes?: number;
 }
 
 interface BillingContextType {

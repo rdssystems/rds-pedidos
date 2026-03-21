@@ -82,10 +82,13 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             const canManageBox = userRoles.includes('owner') || userRoles.includes('manager') || userRoles.includes('cashier');
 
             if (canManageBox && realDiffMins <= 30 && realDiffMins >= -30) {
+                const pendingOrders = store.pedidos_pendentes || 0;
+                const pendingMsg = pendingOrders > 0 ? ` Há ${pendingOrders} pedidos pendentes para finalizar.` : '';
+
                 setClosingAlert(
                     realDiffMins > 0
-                        ? `Faltam ${realDiffMins} minutos para o horário de fechamento configurado. Não esqueça de fechar o caixa!`
-                        : `O horário de fechamento já passou. Não esqueça de fechar o caixa!`
+                        ? `Faltam ${realDiffMins} minutos para o fechamento. Não esqueça de fechar o caixa!${pendingMsg}`
+                        : `O horário de fechamento já passou. Não esqueça de fechar o caixa!${pendingMsg}`
                 );
             } else {
                 setClosingAlert(null);
