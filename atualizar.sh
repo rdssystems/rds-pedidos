@@ -12,7 +12,7 @@ set -e
 cd /root/rds-pedidos
 
 echo "📥 Baixando atualizações do GitHub..."
-git pull origin main
+git fetch origin main && git reset --hard origin/main
 
 if [ -z "$1" ]; then
     echo "🔨 Rebuildando TODOS os serviços..."
