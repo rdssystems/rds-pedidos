@@ -16,11 +16,11 @@ git pull origin main
 
 if [ -z "$1" ]; then
     echo "🔨 Rebuildando TODOS os serviços..."
-    docker compose build --no-cache frontend backend landing-page
+    docker compose build frontend backend landing-page
     docker compose up -d
 else
     echo "🔨 Rebuildando serviço: $1..."
-    docker compose build --no-cache "$1"
+    docker compose build "$1"
     docker compose up -d "$1"
 fi
 
