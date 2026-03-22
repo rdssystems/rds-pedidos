@@ -8,6 +8,7 @@ import json
 import requests
 import logging
 import os
+from django.db.models.signals import post_save, pre_save
 from .services import EvolutionService
 
 
@@ -101,6 +102,46 @@ def notify_order_change(sender, instance, created, **kwargs):
                 logger.info("Chamada para send_whatsapp_message concluída.")
             except Exception as e:
                 logger.error(f"Erro ao chamar send_whatsapp_message: {e}")
+
+@receiver(pre_save, sender=Pedido)
+def calculate_troco(sender, instance, **kwargs):
+    """Calcula o troco automaticamente se o valor pago for maior que o total"""
+    # Garantir que não sejam None para evitar erros de cálculo
+    if instance.valor_pago is None:
+        instance.valor_pago = 0.00
+    if instance.troco is None:
+        instance.troco = 0.00
+
+    if instance.forma_pagamento == 'DINHEIRO' and instance.valor_pago > 0:
+        if instance.valor_pago >= instance.total:
+            instance.troco = instance.valor_pago - instance.total
+        else:
+            instance.troco = 0.00
+
+@receiver(post_save, sender=Pedido)
+def handle_cashier_movement(sender, instance, created, **kwargs):
+    """Registra a venda no caixa quando o pedido é finalizado em dinheiro"""
+    from .models import Caixa, MovimentacaoCaixa
+    
+    if not created and instance.status == 'FINALIZADO' and instance.forma_pagamento == 'DINHEIRO':
+        # Busca o caixa aberto da loja
+        caixa_aberto = Caixa.objects.filter(loja=instance.loja, status='ABERTO').last()
+        
+        if caixa_aberto:
+            # Evita duplicidade (caso o sinal rode duas vezes)
+            if not MovimentacaoCaixa.objects.filter(pedido=instance).exists():
+                descricao = f"Venda Pedido #{instance.numero_diario or instance.id}"
+                if instance.valor_pago > instance.total:
+                    descricao += f" (Pago: {instance.valor_pago}, Troco: {instance.troco})"
+                
+                MovimentacaoCaixa.objects.create(
+                    caixa=caixa_aberto,
+                    tipo='VENDA',
+                    valor=instance.total,
+                    descricao=descricao,
+                    pedido=instance
+                )
+                logger.info(f"Movimentação de caixa registrada para o pedido {instance.id}")
 
 from django.contrib.auth.models import User
 from .models import Produto, ConfiguracaoLoja, Plano, UserProfile

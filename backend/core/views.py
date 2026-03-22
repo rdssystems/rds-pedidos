@@ -972,17 +972,18 @@ class CaixaViewSet(viewsets.ModelViewSet):
         if not caixa:
             return Response({'error': 'Caixa não encontrado ou fechado'}, status=400)
 
+        total_pago = request.data.get('total_pago', valor)
+
         # 1. Create a "Consolidated" Pedido for this sale record
-        # Note: In a real app we might want to link the mesa orders directly.
-        # Here we create a new one to represent the payment event.
         pedido = Pedido.objects.create(
             loja=caixa.loja,
             cliente_nome=cliente_nome,
             cliente_whatsapp=cliente_whatsapp,
             total=valor,
+            valor_pago=total_pago,
             forma_pagamento=forma_pagamento,
             status='FINALIZADO',
-            tipo='RETIRADA' # Sales at POS usually Withdrawal/Local
+            tipo='RETIRADA'
         )
 
         for item in itens_data:
@@ -1000,16 +1001,11 @@ class CaixaViewSet(viewsets.ModelViewSet):
         if mesa_orders_ids:
             Pedido.objects.filter(id__in=mesa_orders_ids).update(status='CANCELADO')
 
-        # 3. Create Cash Move
-        mov = MovimentacaoCaixa.objects.create(
-            caixa=caixa,
-            tipo='VENDA',
-            valor=valor,
-            descricao=f'Venda PDV {f"(Mesa orders: {mesa_orders_ids} - Consolidados)" if mesa_orders_ids else ""}',
-            pedido=pedido
-        )
+        # 3. Movement is now handled by signals.py handle_cashier_movement
+        # Fetch it to return as response
+        mov = MovimentacaoCaixa.objects.filter(pedido=pedido).last()
 
-        return Response(MovimentacaoCaixaSerializer(mov).data)
+        return Response(MovimentacaoCaixaSerializer(mov).data if mov else {"status": "success", "pedido_id": pedido.id})
 
     @action(detail=True, methods=['post'])
     def sangria(self, request, pk=None):

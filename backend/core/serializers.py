@@ -197,7 +197,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             'id', 'loja', 'cliente_nome', 'cliente_whatsapp', 'endereco', 
             'total', 'forma_pagamento', 'status', 'tipo', 'taxa_entrega', 
             'mesa', 'numero_diario', 'observacoes', 'external_id', 'origem', 
-            'criado_em', 'itens'
+            'valor_pago', 'troco', 'criado_em', 'itens'
         ]
 
     def create(self, validated_data):
