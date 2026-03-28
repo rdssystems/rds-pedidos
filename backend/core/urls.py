@@ -37,3 +37,9 @@ urlpatterns = [
     path('api/mp-webhook/', MercadoPagoWebhookView.as_view(), name='mp-webhook'),
     path('api/evolution/webhook/<str:instancia>/', WebhookEvolutionView.as_view(), name='evolution-webhook'),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

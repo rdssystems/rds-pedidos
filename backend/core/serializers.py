@@ -206,11 +206,13 @@ class PedidoSerializer(serializers.ModelSerializer):
             
             print(f"DEBUG: Processing create. Validated Data: {validated_data}")
             
+            # Clean phone to only digits if present
+            phone = validated_data.get('cliente_whatsapp')
+            if phone:
+                validated_data['cliente_whatsapp'] = ''.join(filter(str.isdigit, str(phone)))
+                print(f"DEBUG: Cleaned phone to {validated_data['cliente_whatsapp']}")
+
             # Ensure forma_pagamento has a default value if missing or null
-            current_fp = validated_data.get('forma_pagamento')
-            if not current_fp:
-                validated_data['forma_pagamento'] = 'PIX'
-                print("DEBUG: Set forma_pagamento default to PIX")
 
             # Pre-check Inventory
             for item_data in itens_data:

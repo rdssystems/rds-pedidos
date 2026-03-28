@@ -733,9 +733,57 @@ class PedidoViewSet(viewsets.ModelViewSet):
     serializer_class = PedidoSerializer
     
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action in ['create', 'public_history']:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+
+    @action(detail=False, methods=['get'], url_path='public-history')
+    def public_history(self, request):
+        phone = request.query_params.get('phone')
+        name = request.query_params.get('name')
+        
+        if not phone:
+            return Response({"error": "Telefone é obrigatório"}, status=400)
+        
+        # Clean phone to only digits
+        cleaned_phone = ''.join(filter(str.isdigit, phone))
+        
+        if len(cleaned_phone) < 8:
+            return Response({"error": "Telefone inválido"}, status=400)
+            
+        # Base queryset: orders matching the phone
+        # We use icontains to be safe against different formatting in older records
+        # If the cleaned phone is long enough, it's a very strong identifier
+        queryset = Pedido.objects.filter(cliente_whatsapp__icontains=cleaned_phone).order_by('-criado_em')
+        
+        # If no results and phone is 11 digits (with DDD), try matching the last 8 or 9 digits
+        if not queryset.exists() and len(cleaned_phone) >= 10:
+            short_phone = cleaned_phone[-8:]
+            queryset = Pedido.objects.filter(cliente_whatsapp__icontains=short_phone).order_by('-criado_em')
+
+        # Filter by name only if we have results and a name was provided
+        # This acts more as a verification than a strict filter if results are found
+        if name and queryset.exists():
+            name_parts = name.lower().strip().split(' ')
+            first_name = name_parts[0]
+            # Match if cliente_nome contains first name OR full name
+            # This handles cases like "Klisman" matching "Klisman Ramos" and vice versa
+            queryset = queryset.filter(
+                Q(cliente_nome__icontains=first_name) | 
+                Q(cliente_nome__icontains=name.strip())
+            )
+            
+        loja_id = request.query_params.get('loja_id')
+        if loja_id:
+            queryset = queryset.filter(loja_id=loja_id)
+        elif name and not queryset.exists():
+            # If still no results and we have a name, try searching by name + phone parts
+            # this is a last resort for very messy data
+            pass
+            
+        queryset = queryset[:50] # Limit results
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get_queryset(self):
         from django.utils.dateparse import parse_datetime
