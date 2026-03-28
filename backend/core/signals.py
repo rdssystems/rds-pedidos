@@ -82,13 +82,18 @@ def notify_order_change(sender, instance, created, **kwargs):
             'loja': instance.loja.nome
         }
         
-        if instance.status == 'PREPARO' and instance.loja.notificar_preparo:
+        if instance.status == 'NOVO' and instance.loja.notificar_recebido:
+            msg = instance.loja.msg_recebido.format(**context)
+        elif instance.status == 'PREPARO' and instance.loja.notificar_preparo:
             msg = instance.loja.msg_preparo.format(**context)
-        # Status 'PRONTO' - No notification as requested (waiting for delivery)
+        elif instance.status == 'PRONTO' and instance.loja.notificar_pronto:
+            msg = instance.loja.msg_pronto.format(**context)
         elif instance.status == 'DESPACHADO' and instance.loja.notificar_entrega:
             msg = instance.loja.msg_entrega.format(**context)
         elif instance.status == 'FINALIZADO' and instance.loja.notificar_finalizado:
              msg = instance.loja.msg_finalizado.format(**context)
+        elif instance.status == 'CANCELADO' and instance.loja.notificar_cancelado:
+             msg = instance.loja.msg_cancelado.format(**context)
 
         if msg:
             try:

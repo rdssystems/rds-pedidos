@@ -269,6 +269,8 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
             valor: total,
             total_pago: amountPaid,
             mesa_orders: activeMesaOrders,
+            mesa: activeMesaNum,
+            tipo: activeMesaNum ? 'MESA' : 'BALCAO',
             observacoes: orderObs,
             itens: cart.map(item => ({
                 produto: item.produtoId,
@@ -366,7 +368,8 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
             cliente_nome: clientInfo?.nome || 'Consumidor Final',
             cliente_whatsapp: clientInfo?.whatsapp || '',
             total: total,
-            tipo: 'BALCAO',
+            mesa: activeMesaNum,
+            tipo: activeMesaNum ? 'MESA' : 'BALCAO',
             status: 'NOVO',
             forma_pagamento: 'PIX'
         };

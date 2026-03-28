@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { PosProvider, usePos } from '../../context/PosContext';
+import { useBilling } from '../../context/BillingContext';
 import { ShiftManager } from '../../components/pos/ShiftManager';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, Users, Loader2, ChefHat, UserPlus, X, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
@@ -117,6 +118,7 @@ const ProductAttributesModal = ({ product, onClose, onAdd }: { product: any, onC
 
 const PosContent = () => {
     const { caixa, cart, addToCart, removeFromCart, clearCart, total, checkout, products, loadTableOrders, sendToKitchen } = usePos();
+    const { store } = useBilling();
     const [searchTerm, setSearchTerm] = useState('');
     const [clienteNome, setClienteNome] = useState('');
     const [clienteWhatsapp, setClienteWhatsapp] = useState('');
@@ -207,7 +209,26 @@ const PosContent = () => {
         return acc;
     }, {});
 
-    const sortedCategories = Object.keys(groupedProducts).sort();
+    // Map each category to its order (from the products data)
+    const categoryOrders = filteredProducts.reduce((acc: any, p: any) => {
+        const name = p.categoria_nome || 'Sem Categoria';
+        // We take the minimum order/id seen for this category name
+        if (!(name in acc) || (p.categoria_ordem < acc[name].order)) {
+            acc[name] = { order: p.categoria_ordem ?? 999, id: p.categoria_id ?? 999 };
+        }
+        return acc;
+    }, {});
+
+    const sortedCategories = Object.keys(groupedProducts).sort((a, b) => {
+        const orderA = categoryOrders[a]?.order ?? 999;
+        const orderB = categoryOrders[b]?.order ?? 999;
+        if (orderA !== orderB) return orderA - orderB;
+        
+        // Fallback to ID (Creation Order)
+        const idA = categoryOrders[a]?.id ?? 999;
+        const idB = categoryOrders[b]?.id ?? 999;
+        return idA - idB;
+    });
 
     return (
         <div className="flex flex-col lg:flex-row h-screen bg-gray-100 overflow-hidden relative">
@@ -370,17 +391,76 @@ const PosContent = () => {
             {isCheckoutModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden p-8 space-y-6">
-                        <h2 className="text-xl font-black text-gray-800 uppercase">Pagamento</h2>
-                        <div className="text-center">
-                            <p className="text-4xl font-black text-gray-900">R$ {total.toFixed(2)}</p>
+                        <h2 className="text-xl font-black text-gray-800 uppercase text-center border-b pb-4">Pagamento</h2>
+                        <div className="text-center bg-gray-50 py-6 rounded-xl border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total a Pagar</span>
+                            <p className="text-4xl font-black text-gray-900 mt-1">R$ {total.toFixed(2)}</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map(method => (
-                                <button key={method} onClick={() => setPaymentMethod(method)} className={`p-4 rounded-xl border-2 font-bold uppercase text-xs ${paymentMethod === method ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-500'}`}>{method}</button>
+                                <button key={method} onClick={() => setPaymentMethod(method)} className={`p-4 rounded-xl border-2 font-black uppercase text-[10px] tracking-widest transition-all ${paymentMethod === method ? 'border-primary bg-primary/5 text-primary ring-4 ring-primary/10' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>{method}</button>
                             ))}
                         </div>
-                        <button onClick={handleCheckout} className="w-full py-4 bg-green-600 text-white font-black text-lg uppercase rounded-xl shadow-lg active:scale-95">Confirmar</button>
-                        <button onClick={() => setIsCheckoutModalOpen(false)} className="w-full py-2 text-gray-400 font-bold uppercase text-xs">Cancelar</button>
+                        <div className="pt-4 space-y-3">
+                            <button onClick={handleCheckout} className="w-full py-5 bg-green-500 text-white font-black text-lg uppercase tracking-widest rounded-xl shadow-xl hover:bg-green-600 active:scale-95 transition-all">FINALIZAR VENDA</button>
+                            <button onClick={() => setIsCheckoutModalOpen(false)} className="w-full py-2 text-gray-400 font-bold uppercase text-[10px] tracking-widest hover:text-gray-600 transition-colors">CANCELAR</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isTableModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="p-6 border-b flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 uppercase italic tracking-tight">Vincular/Importar Mesa</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Selecione uma mesa ocupada para importar ou livre para vincular</p>
+                            </div>
+                            <button onClick={() => setIsTableModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <X size={24} className="text-gray-400" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            {loadingMesas ? (
+                                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                    <Loader2 className="animate-spin text-primary" size={48} />
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Carregando Mesas...</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+                                    {Array.from({ length: store?.quantidade_mesas || 0 }, (_, i) => i + 1).map(num => {
+                                        const status = mesas.find(m => String(m.mesa) === String(num));
+                                        const isOccupied = !!status;
+                                        return (
+                                            <button 
+                                                key={num} 
+                                                onClick={() => handleImportTable(num)}
+                                                className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all p-2 group ${isOccupied 
+                                                    ? 'bg-red-50 border-red-200 shadow-md shadow-red-500/5' 
+                                                    : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl hover:-translate-y-1'
+                                                }`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isOccupied 
+                                                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
+                                                    : 'bg-gray-100 text-gray-400 group-hover:bg-primary/20 group-hover:text-primary'
+                                                }`}>
+                                                    <span className="text-lg font-black">{num}</span>
+                                                </div>
+                                                <span className={`text-[9px] font-black uppercase tracking-widest leading-none ${isOccupied ? 'text-red-600' : 'text-gray-300 group-hover:text-primary'}`}>
+                                                    {isOccupied ? 'OCUPADA' : 'LIVRE'}
+                                                </span>
+                                                {isOccupied && (
+                                                    <div className="mt-1.5 px-2 py-0.5 bg-red-100 rounded-full border border-red-200">
+                                                        <p className="text-[9px] font-black text-red-700 leading-none">R$ {status.total.toFixed(0)}</p>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

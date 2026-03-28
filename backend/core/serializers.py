@@ -130,7 +130,14 @@ class ProdutoSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         try:
             representation['grupos_atributos'] = GrupoDeAtributosSerializer(instance.grupos_atributos.all(), many=True).data
-            representation['categoria_nome'] = instance.categoria.nome if instance.categoria else 'Sem Categoria'
+            if instance.categoria:
+                representation['categoria_nome'] = instance.categoria.nome
+                representation['categoria_id'] = instance.categoria.id
+                representation['categoria_ordem'] = instance.categoria.ordem
+            else:
+                representation['categoria_nome'] = 'Sem Categoria'
+                representation['categoria_id'] = None
+                representation['categoria_ordem'] = 999
         except Exception:
             representation['grupos_atributos'] = []
         return representation
@@ -163,8 +170,8 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'logo', 'banner', 'whatsapp', 'endereco', 'horario_funcionamento', 'ativa',
             'evolution_instance', 'evolution_token',
             'ifood_client_id', 'ifood_client_secret', 'ifood_merchant_id', 'ifood_active',
-            'notificar_preparo', 'notificar_entrega', 'notificar_finalizado',
-            'msg_preparo', 'msg_entrega', 'msg_finalizado',
+            'notificar_recebido', 'notificar_preparo', 'notificar_pronto', 'notificar_entrega', 'notificar_finalizado', 'notificar_cancelado',
+            'msg_recebido', 'msg_preparo', 'msg_pronto', 'msg_entrega', 'msg_finalizado', 'msg_cancelado',
             'plano', 'plano_details', 'plano_tipo', 'status_assinatura', 'valido_ate',
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
             'categorias', 'bairros_entrega',

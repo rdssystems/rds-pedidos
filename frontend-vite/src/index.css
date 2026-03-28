@@ -29,6 +29,9 @@ body {
   .animate-slide-left {
     animation: slideLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+  .animate-slow-zoom {
+    animation: slowZoom 20s ease-in-out infinite alternate;
+  }
   
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
@@ -58,4 +61,9 @@ body {
 @keyframes slideLeft {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
+}
+
+@keyframes slowZoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
 }

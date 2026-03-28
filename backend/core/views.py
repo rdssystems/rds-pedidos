@@ -397,8 +397,8 @@ class StoreViewSet(viewsets.ModelViewSet):
             
         # Preços definidos na nossa conversa estratégica
         prices = {
-            'START': 49.90,
-            'PRO': 129.90
+            'START': 69.90,
+            'PRO': 149.90
         }
         
         service = MercadoPagoService()

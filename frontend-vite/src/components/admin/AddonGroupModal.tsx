@@ -100,7 +100,16 @@ export const AddonGroupModal = ({ isOpen, onClose, onSuccess, group }: AddonGrou
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(JSON.stringify(data));
+                console.error('API Error:', data);
+                
+                // Tratar erros amigavelmente
+                if (typeof data === 'object') {
+                    const firstError = Object.values(data)[0];
+                    if (Array.isArray(firstError)) throw new Error(firstError[0]);
+                    if (typeof firstError === 'string') throw new Error(firstError);
+                }
+                
+                throw new Error('Erro ao salvar grupo. Verifique os dados e tente novamente.');
             }
 
             onSuccess();
@@ -122,12 +131,16 @@ export const AddonGroupModal = ({ isOpen, onClose, onSuccess, group }: AddonGrou
                     <h2 className="text-xl font-black text-gray-900 italic tracking-tight uppercase">
                         {group ? 'Editar Grupo de Adicionais' : 'Novo Grupo de Adicionais'}
                     </h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
+                    >
                         <X size={20} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                <form id="addon-group-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
                     {error && (
                         <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm flex items-center gap-2">
                             <AlertCircle size={16} />
@@ -229,8 +242,19 @@ export const AddonGroupModal = ({ isOpen, onClose, onSuccess, group }: AddonGrou
                 </form>
 
                 <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200">Cancelar</button>
-                    <button onClick={handleSubmit} disabled={loading} className="px-6 py-2.5 rounded-xl font-bold bg-primary text-white shadow-lg flex items-center gap-2">
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit"
+                        form="addon-group-form"
+                        disabled={loading} 
+                        className="px-6 py-2.5 rounded-xl font-bold bg-primary text-white shadow-lg flex items-center gap-2 hover:bg-primary/90 disabled:opacity-50"
+                    >
                         {loading ? 'Salvando...' : <Check size={18} />} Salvar Grupo
                     </button>
                 </div>

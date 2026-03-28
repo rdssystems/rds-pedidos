@@ -12,7 +12,12 @@ import {
     Truck,
     Plus,
     Trash2,
-    QrCode
+    QrCode,
+    Bot,
+    Sparkles,
+    Brain,
+    Bell,
+    MessageSquare
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useBilling } from '@/context/BillingContext';
@@ -38,13 +43,25 @@ export default function StoreSettings() {
     const [endereco, setEndereco] = useState('');
 
     // Notification Settings
+    const [notificarRecebido, setNotificarRecebido] = useState(true);
     const [notificarPreparo, setNotificarPreparo] = useState(true);
+    const [notificarPronto, setNotificarPronto] = useState(true);
     const [notificarEntrega, setNotificarEntrega] = useState(true);
     const [notificarFinalizado, setNotificarFinalizado] = useState(true);
+    const [notificarCancelado, setNotificarCancelado] = useState(true);
 
+    const [msgRecebido, setMsgRecebido] = useState('Olá {cliente}! 👋 Recebemos seu pedido #{numero} em *{loja}*. Já estamos analisando!');
     const [msgPreparo, setMsgPreparo] = useState('Olá {cliente}! 👨‍🍳 Seu pedido #{numero} começou a ser preparado em *{loja}*. Em breve avisaremos quando sair para entrega!');
+    const [msgPronto, setMsgPronto] = useState('Olá {cliente}! ✅ Seu pedido #{numero} de *{loja}* está pronto!');
     const [msgEntrega, setMsgEntrega] = useState('Olá {cliente}! 🛵 Seu pedido #{numero} de *{loja}* saiu para entrega! Fique atento(a).');
     const [msgFinalizado, setMsgFinalizado] = useState('Pedido #{numero} de *{loja}* concluído. Obrigado pela preferência, {cliente}! ⭐');
+    const [msgCancelado, setMsgCancelado] = useState('Olá {cliente}, seu pedido #{numero} em *{loja}* foi cancelado. Se tiver dúvidas, entre em contato conosco.');
+
+    // AI Bot Settings
+    const [botAtivoWhatsapp, setBotAtivoWhatsapp] = useState(false);
+    const [botPersonalidade, setBotPersonalidade] = useState('');
+    const [botConhecimento, setBotConhecimento] = useState('');
+    const [botAlertaTransbordo, setBotAlertaTransbordo] = useState(true);
 
     // Delivery Settings
     const [tipoTaxaEntrega, setTipoTaxaEntrega] = useState<'FIXA' | 'BAIRRO'>('FIXA');
@@ -135,12 +152,28 @@ export default function StoreSettings() {
                     if (s.horario_funcionamento) {
                         setHorario(parseSchedule(s.horario_funcionamento));
                     }
+                    
+                    // Notifications
+                    setNotificarRecebido(s.notificar_recebido ?? true);
                     setNotificarPreparo(s.notificar_preparo ?? true);
+                    setNotificarPronto(s.notificar_pronto ?? true);
                     setNotificarEntrega(s.notificar_entrega ?? true);
                     setNotificarFinalizado(s.notificar_finalizado ?? true);
+                    setNotificarCancelado(s.notificar_cancelado ?? true);
+                    
+                    setMsgRecebido(s.msg_recebido || 'Olá {cliente}! 👋 Recebemos seu pedido #{numero} em *{loja}*. Já estamos analisando!');
                     setMsgPreparo(s.msg_preparo || 'Olá {cliente}! 👨‍🍳 Seu pedido #{numero} começou a ser preparado em *{loja}*. Em breve avisaremos quando sair para entrega!');
+                    setMsgPronto(s.msg_pronto || 'Olá {cliente}! ✅ Seu pedido #{numero} de *{loja}* está pronto!');
                     setMsgEntrega(s.msg_entrega || 'Olá {cliente}! 🛵 Seu pedido #{numero} de *{loja}* saiu para entrega! Fique atento(a).');
                     setMsgFinalizado(s.msg_finalizado || 'Pedido #{numero} de *{loja}* concluído. Obrigado pela preferência, {cliente}! ⭐');
+                    setMsgCancelado(s.msg_cancelado || 'Olá {cliente}, seu pedido #{numero} em *{loja}* foi cancelado. Se tiver dúvidas, entre em contato conosco.');
+
+                    // AI Bot
+                    setBotAtivoWhatsapp(s.bot_ativo_whatsapp || false);
+                    setBotPersonalidade(s.bot_personalidade || '');
+                    setBotConhecimento(s.bot_conhecimento || '');
+                    setBotAlertaTransbordo(s.bot_alerta_transbordo ?? true);
+
                     setLogoPreview(getImageUrl(s.logo));
                     setBannerPreview(getImageUrl(s.banner));
 
@@ -193,12 +226,28 @@ export default function StoreSettings() {
             formData.append('cor_primaria', primaryColor);
             formData.append('cor_secundaria', secondaryColor);
             formData.append('horario_funcionamento', JSON.stringify(horario));
+            
+            // Notifications
+            formData.append('notificar_recebido', String(notificarRecebido));
             formData.append('notificar_preparo', String(notificarPreparo));
+            formData.append('notificar_pronto', String(notificarPronto));
             formData.append('notificar_entrega', String(notificarEntrega));
             formData.append('notificar_finalizado', String(notificarFinalizado));
+            formData.append('notificar_cancelado', String(notificarCancelado));
+
+            formData.append('msg_recebido', msgRecebido);
             formData.append('msg_preparo', msgPreparo);
+            formData.append('msg_pronto', msgPronto);
             formData.append('msg_entrega', msgEntrega);
             formData.append('msg_finalizado', msgFinalizado);
+            formData.append('msg_cancelado', msgCancelado);
+
+            // AI Bot
+            formData.append('bot_ativo_whatsapp', String(botAtivoWhatsapp));
+            formData.append('bot_personalidade', botPersonalidade);
+            formData.append('bot_conhecimento', botConhecimento);
+            formData.append('bot_alerta_transbordo', String(botAlertaTransbordo));
+
             formData.append('tipo_taxa_entrega', tipoTaxaEntrega);
             formData.append('taxa_entrega_fixa', taxaEntregaFixa.replace(',', '.'));
             formData.append('modo_catalogo', String(modoCatalogo));
@@ -333,8 +382,8 @@ export default function StoreSettings() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
-                <div className="lg:col-span-7 space-y-8">
+            <main className="max-w-4xl mx-auto p-8 space-y-8">
+                <div className="space-y-8">
                     {/* Link do Cardápio */}
                     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-8 shadow-xl text-white space-y-6 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
@@ -413,20 +462,26 @@ export default function StoreSettings() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-3">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Cores</label>
-                                    <div className="flex gap-3">
-                                        <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-12 rounded-xl cursor-pointer border-2 border-white shadow-sm" />
-                                        <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-12 h-12 rounded-xl cursor-pointer border-2 border-white shadow-sm" />
-                                    </div>
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Logo</label>
-                                    <input type="file" id="store-logo" className="hidden" accept="image/*" onChange={handleLogoChange} />
-                                    <div onClick={() => document.getElementById('store-logo')?.click()} className="border-2 border-dashed border-gray-200 rounded-xl h-[48px] w-48 flex items-center justify-center cursor-pointer relative overflow-hidden">
-                                        {logoPreview ? <img src={logoPreview} className="h-full object-contain p-1" alt="Logo" /> : <Upload size={20} className="text-gray-300" />}
-                                    </div>
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Logo da Loja</label>
+                                <input type="file" id="store-logo" className="hidden" accept="image/*" onChange={handleLogoChange} />
+                                <div 
+                                    onClick={() => document.getElementById('store-logo')?.click()} 
+                                    className="border-2 border-dashed border-gray-200 rounded-2xl h-32 w-32 flex items-center justify-center cursor-pointer group relative overflow-hidden bg-gray-50 hover:bg-white hover:border-primary hover:shadow-lg transition-all"
+                                >
+                                    {logoPreview ? (
+                                        <>
+                                            <img src={logoPreview} className="w-full h-full object-contain p-2" alt="Logo" />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                <Upload size={24} className="text-white" />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Upload size={24} className="text-gray-300 group-hover:text-primary transition-colors" />
+                                            <span className="text-[10px] font-black text-gray-400 uppercase">Logo</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -483,31 +538,164 @@ export default function StoreSettings() {
                            </div>
                         )}
                     </div>
-                </div>
 
-                {/* Preview Mobile */}
-                <div className="lg:col-span-5 hidden lg:block sticky top-32 h-fit">
-                    <div className="bg-gray-900 rounded-[2.5rem] p-4 shadow-2xl border-[10px] border-gray-800 relative aspect-[9/18]">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-800 rounded-b-[2rem] z-20"></div>
-                        <div className="h-full w-full bg-white rounded-xl overflow-hidden flex flex-col shadow-inner" style={{ backgroundColor: secondaryColor }}>
-                            <div className="pt-10 pb-6 px-6 text-center text-white" style={{ backgroundColor: primaryColor }}>
-                                <div className="w-16 h-16 bg-white rounded-xl mx-auto shadow-xl flex items-center justify-center overflow-hidden border-2 border-white/20">
-                                    {logoPreview && <img src={logoPreview} className="h-full object-contain" alt="Logo preview" />}
-                                </div>
-                                <h3 className="font-black text-sm italic uppercase mt-3">{storeName}</h3>
+                    {/* Notificações WhatsApp */}
+                    <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 space-y-8">
+                        <div className="flex items-center gap-3 border-l-4 border-green-500 pl-4">
+                            <MessageSquare className="text-green-500" />
+                            <div className="flex flex-col">
+                                <h2 className="text-xl font-bold text-gray-900 uppercase italic leading-none">Notificações WhatsApp</h2>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Personalize as mensagens automáticas</p>
                             </div>
-                            <div className="p-4 flex-1 space-y-4">
-                                <div className="h-4 w-24 bg-gray-100 rounded-full" style={{ borderLeft: `4px solid ${primaryColor}` }}></div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {[1, 2].map(i => (
-                                        <div key={i} className="bg-white p-2 rounded-xl shadow-sm space-y-2">
-                                            <div className="h-20 bg-gray-100 rounded-xl"></div>
-                                            <div className="h-2 w-12 bg-gray-50 rounded-full"></div>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Recebido */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                                            <Bell size={18} />
                                         </div>
-                                    ))}
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Pedido Recebido</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarRecebido} onChange={(e) => setNotificarRecebido(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarRecebido && (
+                                    <textarea 
+                                        value={msgRecebido} 
+                                        onChange={(e) => setMsgRecebido(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Em Preparo */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                            <Clock size={18} />
+                                        </div>
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Em Preparo</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarPreparo} onChange={(e) => setNotificarPreparo(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarPreparo && (
+                                    <textarea 
+                                        value={msgPreparo} 
+                                        onChange={(e) => setMsgPreparo(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                        placeholder="Ex: Olá {cliente}! Seu pedido #{numero} está em preparo..."
+                                    />
+                                )}
+                            </div>
+
+                            {/* Pronto */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                            <CheckCircle2 size={18} />
+                                        </div>
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Pedido Pronto</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarPronto} onChange={(e) => setNotificarPronto(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarPronto && (
+                                    <textarea 
+                                        value={msgPronto} 
+                                        onChange={(e) => setMsgPronto(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Entrega */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                                            <Truck size={18} />
+                                        </div>
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Saiu para Entrega</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarEntrega} onChange={(e) => setNotificarEntrega(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarEntrega && (
+                                    <textarea 
+                                        value={msgEntrega} 
+                                        onChange={(e) => setMsgEntrega(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Finalizado */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                                            <CheckCircle2 size={18} />
+                                        </div>
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Finalizado</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarFinalizado} onChange={(e) => setNotificarFinalizado(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarFinalizado && (
+                                    <textarea 
+                                        value={msgFinalizado} 
+                                        onChange={(e) => setMsgFinalizado(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Cancelado */}
+                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-md group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                                            <Trash2 size={18} />
+                                        </div>
+                                        <span className="text-sm font-black text-gray-700 uppercase italic">Cancelado</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={notificarCancelado} onChange={(e) => setNotificarCancelado(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </label>
+                                </div>
+                                {notificarCancelado && (
+                                    <textarea 
+                                        value={msgCancelado} 
+                                        onChange={(e) => setMsgCancelado(e.target.value)}
+                                        className="w-full h-24 p-4 bg-white border border-gray-100 rounded-xl text-xs font-medium text-gray-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="bg-blue-50 p-4 rounded-xl flex gap-4">
+                                <Sparkles className="text-blue-500 shrink-0" size={20} />
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest italic">Dica Pro</p>
+                                    <p className="text-[10px] font-bold text-blue-600 uppercase italic leading-tight">Use as variáveis: <code className="bg-white px-1 rounded">{'{cliente}'}</code>, <code className="bg-white px-1 rounded">{'{numero}'}</code> e <code className="bg-white px-1 rounded">{'{loja}'}</code> para personalizar automaticamente.</p>
                                 </div>
                             </div>
-                            <div className="p-4 border-t"><div className="w-full py-3 rounded-xl shadow-lg text-white font-black uppercase text-[10px] text-center" style={{ backgroundColor: primaryColor }}>Pedir Agora</div></div>
                         </div>
                     </div>
                 </div>

@@ -58,7 +58,7 @@ const TablesPage = () => {
     }
 
     const getMesaStatus = (num: number) => {
-        return mesas.find(m => m.mesa === num) || null;
+        return mesas.find(m => String(m.mesa) === String(num)) || null;
     };
 
     return (

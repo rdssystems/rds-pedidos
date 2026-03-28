@@ -16,7 +16,7 @@ try:
     pro_plan, created = Plano.objects.get_or_create(
         nome='PRO',
         defaults={
-            'preco_mensal': 129.90,
+            'preco_mensal': 149.90,
             'max_produtos': 1000,
             'recursos': {
                 'whatsapp': True, 

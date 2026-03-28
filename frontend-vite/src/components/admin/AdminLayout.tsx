@@ -172,8 +172,12 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                     >
                         <Menu size={24} />
                     </button>
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0">
-                        {store?.nome?.[0] || 'R'}
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0 overflow-hidden">
+                        {store?.logo ? (
+                            <img src={`${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
+                        ) : (
+                            store?.nome?.[0] || 'R'
+                        )}
                     </div>
                     <h1 className="text-base font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight line-clamp-2 max-w-[200px]">{store?.nome || 'Admin'}</h1>
                 </div>
@@ -213,8 +217,12 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className={`p-6 ${isMinimized ? 'px-4' : 'pb-4 p-8'}`}>
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-[#eef2ff] rounded-[6px] flex items-center justify-center text-[#4338ca] shadow-sm shrink-0 mx-auto font-black italic border border-[#c7d2fe]/20">
-                                {store?.nome?.[0] || 'R'}
+                            <div className="w-9 h-9 bg-[#eef2ff] rounded-[8px] flex items-center justify-center text-[#4338ca] shadow-sm shrink-0 mx-auto font-black italic border border-[#c7d2fe]/20 overflow-hidden">
+                                {store?.logo ? (
+                                    <img src={`${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
+                                ) : (
+                                    store?.nome?.[0] || 'R'
+                                )}
                             </div>
                             {!isMinimized && (
                                 <div className="flex flex-col min-w-0">
@@ -288,7 +296,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                                     return (
                                         <div className="flex items-center justify-between">
                                             <span className={`text-[8px] font-black px-2 py-0.5 rounded bg-[#006D76] text-white uppercase tracking-widest`}>
-                                                PRO {currentPlan}
+                                                {currentPlan.toUpperCase().includes('PRO') ? currentPlan : `PRO ${currentPlan}`}
                                             </span>
                                             <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
                                                 {store.status_assinatura === 'trial' ? 'Aberto' : 'Ativo'}

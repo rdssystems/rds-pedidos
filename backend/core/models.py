@@ -103,16 +103,27 @@ class ConfiguracaoLoja(models.Model):
     bot_alerta_transbordo = models.CharField(max_length=500, blank=True, null=True, help_text="Critérios para a IA parar de responder e chamar um humano")
 
     # Notification Customization
+    notificar_recebido = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido for recebido")
     notificar_preparo = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido entrar em preparo")
+    notificar_pronto = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido estiver pronto")
     notificar_entrega = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido sair para entrega")
     notificar_finalizado = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido for finalizado")
+    notificar_cancelado = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido for cancelado")
     
     # QR Code & Catalog Features
     modo_catalogo = models.BooleanField(default=False, help_text="Se ativado, o cardápio funcionará apenas para visualização")
     quantidade_mesas = models.PositiveIntegerField(default=0, help_text="Número de mesas para geração de QR Codes")
 
+    msg_recebido = models.TextField(
+        default="Olá {cliente}! 👋 Recebemos seu pedido #{numero} em *{loja}*. Já vamos começar a preparar!",
+        help_text="Variáveis: {cliente}, {numero}, {loja}"
+    )
     msg_preparo = models.TextField(
         default="Olá {cliente}! 👨‍🍳 Seu pedido #{numero} começou a ser preparado em *{loja}*. Em breve avisaremos quando sair para entrega!",
+        help_text="Variáveis: {cliente}, {numero}, {loja}"
+    )
+    msg_pronto = models.TextField(
+        default="Olá {cliente}! ✨ Seu pedido #{numero} está pronto! Se for retirada, já pode vir buscar. Se for entrega, sairá em instantes.",
         help_text="Variáveis: {cliente}, {numero}, {loja}"
     )
     msg_entrega = models.TextField(
@@ -121,6 +132,10 @@ class ConfiguracaoLoja(models.Model):
     )
     msg_finalizado = models.TextField(
         default="Pedido #{numero} de *{loja}* concluído. Obrigado pela preferência, {cliente}! ⭐",
+        help_text="Variáveis: {cliente}, {numero}, {loja}"
+    )
+    msg_cancelado = models.TextField(
+        default="Olá {cliente}. Infelizmente seu pedido #{numero} em *{loja}* precisou ser cancelado. Se tiver dúvidas, entre em contato conosco.",
         help_text="Variáveis: {cliente}, {numero}, {loja}"
     )
 

@@ -45,10 +45,20 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#0f172a] relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-gray-900 relative overflow-hidden font-inter">
+            {/* Background Image with Overlay */}
+            <div className="absolute inset-0 z-0 scale-105 animate-slow-zoom">
+                <img 
+                    src="/login-bg.png" 
+                    className="w-full h-full object-cover opacity-40 brightness-[0.6] sepia-[0.2]" 
+                    alt="Background" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 via-gray-900/40 to-primary/10"></div>
+            </div>
+
             {/* Abstract Background Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]"></div>
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[150px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-[150px]"></div>
 
             <div className="z-10 w-full max-w-md p-8">
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
