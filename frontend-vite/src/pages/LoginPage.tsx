@@ -49,7 +49,7 @@ export default function LoginPage() {
             {/* Background Image with Overlay */}
             <div className="absolute inset-0 z-0 scale-105 animate-slow-zoom">
                 <img 
-                    src="/login-bg.png" 
+                    src={`/login-bg.png?v=${new Date().getTime()}`} 
                     className="w-full h-full object-cover opacity-40 brightness-[0.6] sepia-[0.2]" 
                     alt="Background" 
                 />
@@ -66,7 +66,7 @@ export default function LoginPage() {
                         <div className="w-32 h-32 mb-6 relative group">
                             <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-500"></div>
                             <img
-                                src="/logo-rds.png"
+                                src={`/logo-rds.png?v=${new Date().getTime()}`}
                                 alt="rDs Pedidos Logo"
                                 className="w-full h-full object-contain relative z-10 drop-shadow-2xl hover:scale-105 transition-transform duration-300"
                             />
