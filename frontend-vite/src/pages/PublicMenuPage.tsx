@@ -548,18 +548,46 @@ export default function PublicMenuPage() {
 
                 {/* B. CENTRAL PRODUCTS GRID */}
                 <div className="flex-1 space-y-10">
-                    {/* Search Bar - Rectangular Enterprise Style */}
-                    <div className="relative group max-w-2xl">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-300">
-                            <Search size={18} style={{ color: store.cor_primaria || '#007A87' }} />
+                    <div className="space-y-4">
+                        {/* Search Bar - Rectangular Enterprise Style */}
+                        <div className="relative group max-w-2xl">
+                            <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-300">
+                                <Search size={18} style={{ color: store.cor_primaria || '#007A87' }} />
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="Busque por pratos ou bebidas..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-12 pr-6 py-4 bg-white border border-gray-200 rounded-lg shadow-sm text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                            />
                         </div>
-                        <input 
-                            type="text" 
-                            placeholder="Busque por pratos ou bebidas..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-6 py-4 bg-white border border-gray-200 rounded-lg shadow-sm text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        />
+
+                        {/* Mobile Category Selector */}
+                        <div className="md:hidden">
+                            <div className="relative">
+                                <select 
+                                    value={activeCategory || ''}
+                                    onChange={(e) => {
+                                        const id = Number(e.target.value);
+                                        setActiveCategory(id);
+                                        document.getElementById(`cat-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                                    }}
+                                    className="w-full h-12 pl-12 pr-10 bg-white border border-gray-200 rounded-lg shadow-sm text-xs font-bold uppercase tracking-widest text-gray-700 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+                                >
+                                    <option value="" disabled>Filtrar por Categoria</option>
+                                    {store.categorias.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none">
+                                    <List size={18} />
+                                </div>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <ChevronDown size={18} />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Products Sections */}

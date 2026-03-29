@@ -20,6 +20,7 @@ import {
     List,
     QrCode,
     ChevronRight,
+    ChevronDown,
     AlertCircle,
     CheckCircle2
 } from 'lucide-react';
@@ -320,15 +321,43 @@ export default function PublicTablePage() {
                 />
 
                 <div className="flex-1 space-y-8">
-                    <div className="relative max-w-2xl">
-                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar no cardápio..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-6 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm text-sm font-bold placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
-                        />
+                    <div className="space-y-4">
+                        <div className="relative max-w-2xl">
+                            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar no cardápio..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-12 pr-6 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm text-sm font-bold placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                            />
+                        </div>
+
+                        {/* Mobile Category Selector */}
+                        <div className="md:hidden">
+                            <div className="relative">
+                                <select 
+                                    value={activeCategory || ''}
+                                    onChange={(e) => {
+                                        const id = Number(e.target.value);
+                                        setActiveCategory(id);
+                                        document.getElementById(`cat-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
+                                    className="w-full h-12 pl-12 pr-10 bg-white border border-gray-200 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest text-gray-700 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+                                >
+                                    <option value="" disabled>Categorias</option>
+                                    {store.categorias.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none">
+                                    <List size={16} />
+                                </div>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <ChevronDown size={16} />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {!isOpenStatus.open && (
