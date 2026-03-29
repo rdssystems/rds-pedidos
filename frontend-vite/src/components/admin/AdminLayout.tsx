@@ -292,15 +292,38 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                         {!isMinimized && store && (
                             <div className="w-full flex flex-col gap-2 pt-2 border-t border-gray-100">
                                 {(() => {
-                                    const currentPlan = store.plano_details?.nome || 'Sem Plano';
+                                    const currentPlan = store.plano_details?.nome || 'START';
+                                    
+                                    // Calculate remaining days
+                                    const getRemainingDays = () => {
+                                        if (!store.valido_ate) return null;
+                                        const now = new Date();
+                                        const expiry = new Date(store.valido_ate);
+                                        const diffTime = expiry.getTime() - now.getTime();
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                        return diffDays;
+                                    };
+                                    
+                                    const daysLeft = getRemainingDays();
+
                                     return (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded bg-[#006D76] text-white uppercase tracking-widest`}>
-                                                {currentPlan.toUpperCase().includes('PRO') ? currentPlan : `PRO ${currentPlan}`}
-                                            </span>
-                                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
-                                                {store.status_assinatura === 'trial' ? 'Aberto' : 'Ativo'}
-                                            </span>
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[8px] font-black px-2 py-0.5 rounded bg-[#006D76] text-white uppercase tracking-widest">
+                                                    {currentPlan}
+                                                </span>
+                                                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
+                                                    {store.status_assinatura === 'trial' ? 'Grátis' : 'Ativo'}
+                                                </span>
+                                            </div>
+                                            {daysLeft !== null && (
+                                                <div className="flex items-center justify-between group/days">
+                                                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Vencimento</span>
+                                                    <span className={`text-[9px] font-black italic tracking-tighter ${daysLeft <= 3 ? 'text-red-500' : 'text-gray-900'}`}>
+                                                        {daysLeft <= 0 ? 'Expirado' : `EXPIRA EM ${daysLeft} DIAS`}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })()}
