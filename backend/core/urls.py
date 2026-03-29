@@ -6,7 +6,7 @@ from .views import (
     ProdutoViewSet, GrupoDeAtributosViewSet, AtributoOpcaoViewSet,
     TeamMemberViewSet, RegisterView, api_status, UserViewSet,
     DashboardStatsView, CaixaViewSet, BairroEntregaViewSet,
-    MercadoPagoWebhookView, WebhookEvolutionView
+    MercadoPagoWebhookView, WebhookEvolutionView, NotificacaoSistemaViewSet
 )
 
 router = DefaultRouter()
@@ -20,6 +20,7 @@ router.register(r'equipe', TeamMemberViewSet, basename='equipe')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'caixa', CaixaViewSet, basename='caixa')
 router.register(r'bairros', BairroEntregaViewSet, basename='bairro')
+router.register(r'notificacoes-sistema', NotificacaoSistemaViewSet, basename='notificacaosistema')
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,

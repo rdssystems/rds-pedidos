@@ -653,7 +653,7 @@ class DashboardStatsView(APIView):
 
         # System Notifications
         from .models import NotificacaoSistema
-        recent_notifications = NotificacaoSistema.objects.filter(loja=loja).order_by('-criado_em')[:5]
+        recent_notifications = NotificacaoSistema.objects.filter(loja=loja, lida=False).order_by('-criado_em')[:5]
         formatted_notifications = [
             {
                 "id": notif.id,
@@ -681,6 +681,20 @@ class DashboardStatsView(APIView):
             "recent_orders": PedidoSerializer(historico, many=True).data,
             "notificacoes": formatted_notifications
         })
+
+class NotificacaoSistemaViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificacaoSistemaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return NotificacaoSistema.objects.filter(Q(loja__owner=self.request.user) | Q(loja__equipe__user=self.request.user)).distinct()
+
+    @action(detail=True, methods=['post'], url_path='marcar-lida')
+    def marcar_lida(self, request, pk=None):
+        notif = self.get_object()
+        notif.lida = True
+        notif.save()
+        return Response({'status': 'ok'})
 
 class CategoriaViewSet(viewsets.ModelViewSet):
     serializer_class = CategoriaSerializer

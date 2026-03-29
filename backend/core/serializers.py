@@ -286,3 +286,8 @@ class CaixaSerializer(serializers.ModelSerializer):
         total_entradas = obj.movimentacoes.filter(tipo__in=['ABERTURA', 'VENDA', 'SUPRIMENTO']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
         total_saidas = obj.movimentacoes.filter(tipo__in=['SANGRIA']).aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
         return float(total_entradas - total_saidas)
+
+class NotificacaoSistemaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NotificacaoSistema
+        fields = '__all__'

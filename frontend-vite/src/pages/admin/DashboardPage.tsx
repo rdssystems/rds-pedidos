@@ -6,7 +6,8 @@ import {
     LayoutGrid,
     CreditCard,
     AlertCircle,
-    Banknote
+    Banknote,
+    X
 } from 'lucide-react';
 import {
     XAxis,
@@ -106,8 +107,23 @@ export default function DashboardPage() {
         { label: 'Saldo em Caixa', value: formatCurrency(stats.saldo_caixa || 0), icon: Banknote, color: 'text-purple-500', bg: 'bg-purple-500/10' },
     ];
 
+    const handleDismissNotification = async (notifId: number) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`/api/notificacoes-sistema/${notifId}/marcar-lida/`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            // Update local state to remove it immediately
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+        } catch (error) {
+            console.error('Error dismissing notification:', error);
+        }
+    };
+
     return (
         <div className="p-4 md:p-8 space-y-8 w-full relative min-h-screen bg-transparent">
+            {/* Header omitted for brevity */}
             <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 relative z-10">
                 <div className="space-y-2">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-[0.2em] italic border border-primary/20 backdrop-blur-md">
@@ -138,12 +154,21 @@ export default function DashboardPage() {
             {notifications.length > 0 && (
                 <div className="space-y-3 z-10 relative">
                     {notifications.map((notif: any) => (
-                        <div key={notif.id} className="bg-blue-50/80 backdrop-blur-md border border-blue-200 p-4 rounded-lg flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div key={notif.id} className="bg-blue-50/80 backdrop-blur-md border border-blue-200 p-4 rounded-lg flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 group/notif">
                             <div className="bg-blue-500 text-white p-2 rounded-full shrink-0">
                                 <AlertCircle size={20} />
                             </div>
                             <div className="flex-1">
-                                <h4 className="font-bold text-blue-900 text-sm">{notif.titulo}</h4>
+                                <div className="flex justify-between items-start">
+                                    <h4 className="font-bold text-blue-900 text-sm">{notif.titulo}</h4>
+                                    <button 
+                                        onClick={() => handleDismissNotification(notif.id)}
+                                        className="text-blue-300 hover:text-blue-600 p-1 rounded-md transition-colors"
+                                        title="Marcar como lida"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
                                 <p className="text-blue-700 text-xs mt-1 leading-relaxed">{notif.mensagem}</p>
                                 <p className="text-blue-400 text-[10px] mt-2 font-medium uppercase tracking-widest">{new Date(notif.criado_em).toLocaleString('pt-BR')}</p>
                             </div>
