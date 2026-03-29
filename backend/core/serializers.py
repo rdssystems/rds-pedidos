@@ -30,11 +30,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
-    profile = UserProfileSerializer(read_only=True)
+    profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'roles', 'profile']
+
+    def get_profile(self, obj):
+        try:
+            from .models import UserProfile
+            profile, _ = UserProfile.objects.get_or_create(user=obj)
+            return UserProfileSerializer(profile).data
+        except Exception:
+            return None
 
     def get_roles(self, obj):
         roles_data = []
