@@ -16,7 +16,7 @@ git fetch origin main && git reset --hard origin/main
 
 if [ -z "$1" ]; then
     echo "🔨 Rebuildando TODOS os serviços..."
-    docker compose build frontend backend landing-page
+    docker compose build
     docker compose up -d
 else
     echo "🔨 Rebuildando serviço: $1..."
@@ -24,8 +24,14 @@ else
     docker compose up -d "$1"
 fi
 
+echo "🔄 Rodando migrações do banco de dados..."
+docker compose exec -T backend python manage.py migrate --no-input
+
+echo "📦 Coletando arquivos estáticos..."
+docker compose exec -T backend python manage.py collectstatic --no-input
+
 echo ""
 echo "📊 Status dos containers:"
 docker ps --format "table {{.Names}}\t{{.Status}}"
 echo ""
-echo "✅ Atualização concluída!"
+echo "✅ Atualização concluída com sucesso!"
