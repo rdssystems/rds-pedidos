@@ -123,7 +123,7 @@ export const OrderListSimplified = () => {
             const end = new Date(start);
             end.setDate(end.getDate() + 1);
 
-            const url = `/api/pedidos/?start_date=${start.toISOString()}&end_date=${end.toISOString()}`;
+            const url = `/api/pedidos/?start_date=${start.toISOString()}&end_date=${end.toISOString()}&include_pending=true`;
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });

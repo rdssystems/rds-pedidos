@@ -184,8 +184,8 @@ export const KanbanBoard = () => {
                 const startIso = start.toISOString();
                 const endIso = end.toISOString();
 
-                // Always filter by date range
-                const url = `/api/pedidos/?start_date=${startIso}&end_date=${endIso}`;
+                // Always filter by date range, but include all pending orders regardless of date
+                const url = `/api/pedidos/?start_date=${startIso}&end_date=${endIso}&include_pending=true`;
 
                 const response = await fetch(url, {
                     headers: {

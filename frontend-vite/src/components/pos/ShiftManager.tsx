@@ -12,6 +12,19 @@ export const ShiftManager = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+    const [blockingOrders, setBlockingOrders] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (error && error.includes('pendentes') && caixa) {
+            fetch(`/api/caixa/${caixa.id}/blocking_orders/`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            }).then(res => res.json()).then(data => {
+                if (Array.isArray(data)) setBlockingOrders(data);
+            }).catch(console.error);
+        } else {
+            setBlockingOrders([]);
+        }
+    }, [error, caixa]);
 
     // Sangria/Suprimento states
     const [isSangriaModalOpen, setIsSangriaModalOpen] = useState(false);
@@ -189,7 +202,79 @@ export const ShiftManager = () => {
                                 />
                             </div>
 
-                            {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 p-2 rounded">{error}</div>}
+                            {error && (
+                                <div className="space-y-4">
+                                    <div className="text-red-500 text-sm font-black text-center bg-red-50 p-4 rounded-2xl border border-red-100 flex flex-col gap-2 shadow-sm">
+                                        <AlertTriangle size={20} className="mx-auto" />
+                                        <span>{error}</span>
+                                    </div>
+                                    
+                                    {blockingOrders && blockingOrders.length > 0 && (
+                                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar shadow-inner">
+                                            <div className="flex flex-col gap-3 mb-4">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pendências no Sistema</p>
+                                                    <span className="bg-gray-900 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{blockingOrders.length}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={async (e) => {
+                                                        e.preventDefault();
+                                                        const res = await fetch(`/api/caixa/${caixa.id}/force_finalize_all/`, {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                            }
+                                                        });
+                                                        if (res.ok) {
+                                                            setBlockingOrders([]);
+                                                            setError('');
+                                                        }
+                                                    }}
+                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                                                >
+                                                    Finalizar Todos os Pendentes
+                                                </button>
+                                            </div>
+                                            {blockingOrders.map(order => (
+                                                <div key={order.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm hover:border-primary/20 transition-all group">
+                                                    <div className="flex flex-col">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-black text-gray-900 italic tracking-tighter">#{order.numero_diario || order.id}</span>
+                                                            <span className="text-[10px] text-gray-400 font-bold uppercase truncate max-w-[100px]">{order.cliente_nome || 'Sem Nome'}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <span className="text-[8px] font-black text-primary uppercase bg-primary/5 px-2 py-0.5 rounded-full tracking-widest">{order.status}</span>
+                                                            <span className="text-[8px] font-bold text-gray-300 uppercase">{order.tipo}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async (e) => {
+                                                            e.preventDefault();
+                                                            const res = await fetch(`/api/pedidos/${order.id}/`, {
+                                                                method: 'PATCH',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                                },
+                                                                body: JSON.stringify({ status: 'FINALIZADO' })
+                                                            });
+                                                            if (res.ok) {
+                                                                setBlockingOrders(prev => prev.filter(o => o.id !== order.id));
+                                                                if (blockingOrders.length <= 1) setError('');
+                                                            }
+                                                        }}
+                                                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-green-600/20"
+                                                    >
+                                                        Finalizar
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <button
                                 disabled={isSubmitting || !amount}

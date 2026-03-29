@@ -17,7 +17,8 @@ import {
     Sparkles,
     Brain,
     Bell,
-    MessageSquare
+    MessageSquare,
+    X
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useBilling } from '@/context/BillingContext';
@@ -73,6 +74,8 @@ export default function StoreSettings() {
 
     // QR & Catalog Settings
     const [modoCatalogo, setModoCatalogo] = useState(false);
+    const [permitirPedidoMesa, setPermitirPedidoMesa] = useState(false);
+    const [modoCatalogoMesa, setModoCatalogoMesa] = useState(false);
     const [quantidadeMesas, setQuantidadeMesas] = useState(0);
     const [showQRs, setShowQRs] = useState(false);
 
@@ -184,6 +187,8 @@ export default function StoreSettings() {
 
                     // QR & Catalog
                     setModoCatalogo(s.modo_catalogo || false);
+                    setPermitirPedidoMesa(s.permitir_pedido_mesa || false);
+                    setModoCatalogoMesa(s.modo_catalogo_mesa || false);
                     setQuantidadeMesas(s.quantidade_mesas || 0);
                     if (s.quantidade_mesas > 0) setShowQRs(true);
                 }
@@ -227,13 +232,13 @@ export default function StoreSettings() {
             formData.append('cor_secundaria', secondaryColor);
             formData.append('horario_funcionamento', JSON.stringify(horario));
             
-            // Notifications
-            formData.append('notificar_recebido', String(notificarRecebido));
-            formData.append('notificar_preparo', String(notificarPreparo));
-            formData.append('notificar_pronto', String(notificarPronto));
-            formData.append('notificar_entrega', String(notificarEntrega));
-            formData.append('notificar_finalizado', String(notificarFinalizado));
-            formData.append('notificar_cancelado', String(notificarCancelado));
+            // Notifications - Use '1' and '0' for better multipart/form-data compatibility
+            formData.append('notificar_recebido', notificarRecebido ? '1' : '0');
+            formData.append('notificar_preparo', notificarPreparo ? '1' : '0');
+            formData.append('notificar_pronto', notificarPronto ? '1' : '0');
+            formData.append('notificar_entrega', notificarEntrega ? '1' : '0');
+            formData.append('notificar_finalizado', notificarFinalizado ? '1' : '0');
+            formData.append('notificar_cancelado', notificarCancelado ? '1' : '0');
 
             formData.append('msg_recebido', msgRecebido);
             formData.append('msg_preparo', msgPreparo);
@@ -243,14 +248,18 @@ export default function StoreSettings() {
             formData.append('msg_cancelado', msgCancelado);
 
             // AI Bot
-            formData.append('bot_ativo_whatsapp', String(botAtivoWhatsapp));
+            formData.append('bot_ativo_whatsapp', botAtivoWhatsapp ? '1' : '0');
             formData.append('bot_personalidade', botPersonalidade);
             formData.append('bot_conhecimento', botConhecimento);
-            formData.append('bot_alerta_transbordo', String(botAlertaTransbordo));
+            formData.append('bot_alerta_transbordo', botAlertaTransbordo ? '1' : '0');
 
             formData.append('tipo_taxa_entrega', tipoTaxaEntrega);
             formData.append('taxa_entrega_fixa', taxaEntregaFixa.replace(',', '.'));
-            formData.append('modo_catalogo', String(modoCatalogo));
+            
+            // QR & Catalog - Use '1' and '0'
+            formData.append('modo_catalogo', modoCatalogo ? '1' : '0');
+            formData.append('permitir_pedido_mesa', permitirPedidoMesa ? '1' : '0');
+            formData.append('modo_catalogo_mesa', modoCatalogoMesa ? '1' : '0');
             formData.append('quantidade_mesas', String(quantidadeMesas));
 
             if (logoFile) formData.append('logo', logoFile);
@@ -264,15 +273,25 @@ export default function StoreSettings() {
             });
 
             if (res.ok) {
+                const s = await res.json();
                 setSaved(true);
                 refreshBilling();
+                
+                // Update local state with fresh data from server
+                setPermitirPedidoMesa(s.permitir_pedido_mesa ?? false);
+                setModoCatalogoMesa(s.modo_catalogo_mesa ?? false);
+                setQuantidadeMesas(s.quantidade_mesas ?? 0);
+                
                 setTimeout(() => setSaved(false), 3000);
             } else {
                 const data = await res.json();
-                setError(JSON.stringify(data));
+                let errMsg = 'Erro ao salvar. Verifique os dados.';
+                if (data.quantidade_mesas) errMsg = data.quantidade_mesas[0];
+                else if (typeof data === 'object') errMsg = Object.values(data).flat()[0] as string;
+                setError(errMsg);
             }
         } catch (err: any) {
-            setError(err.message || 'Erro ao conectar ao servidor');
+            setError('Erro de conexão ao servidor: ' + (err.message || 'Desconhecido'));
         } finally {
             setIsSaving(false);
         }
@@ -346,10 +365,10 @@ export default function StoreSettings() {
         const hostname = window.location.hostname;
         const isMainApp = hostname.startsWith('app.') || hostname === 'localhost' || hostname === '127.0.0.1';
         
-        const path = isMainApp ? `/s/${storeSlug}` : '/';
-        const query = mesa !== undefined ? `?mesa=${mesa}` : '';
+        const path = isMainApp ? `/s/${storeSlug}` : '';
+        const mesaPath = mesa !== undefined ? `/m/${mesa}` : '';
         
-        return `${baseUrl}${path}${query}`;
+        return `${baseUrl}${path}${mesaPath}`;
     };
 
     return (
@@ -519,22 +538,143 @@ export default function StoreSettings() {
 
                     {/* QR Codes */}
                     <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 space-y-6">
-                        <div className="flex items-center gap-3 border-l-4 border-indigo-500 pl-4">
-                            <QrCode className="text-indigo-500" />
-                            <h2 className="text-xl font-bold text-gray-900 uppercase italic">QR Codes</h2>
+                        <div className="flex items-center justify-between border-l-4 border-indigo-500 pl-4">
+                            <div className="flex items-center gap-3">
+                                <QrCode className="text-indigo-500" />
+                                <h2 className="text-xl font-bold text-gray-900 uppercase italic">Cardápio de Mesa & QR Codes</h2>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <input type="number" value={quantidadeMesas} onChange={(e) => setQuantidadeMesas(parseInt(e.target.value) || 0)} className="w-20 px-4 py-2 bg-gray-50 border rounded-xl font-bold" />
-                            <button onClick={() => setShowQRs(true)} className="bg-indigo-500 text-white px-6 py-2 rounded-xl font-black uppercase text-[10px]">Gerar QRs</button>
-                        </div>
-                        {showQRs && (
-                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-indigo-50/50 p-6 rounded-xl border border-indigo-100">
-                                {Array.from({ length: Math.max(1, quantidadeMesas) }, (_, i) => i + (quantidadeMesas > 0 ? 1 : 0)).map(mesa => (
-                                    <div key={mesa} className="bg-white p-4 rounded-xl flex flex-col items-center gap-3 shadow-sm">
-                                        <QRCode value={mesa === 0 ? getCatalogUrl() : getCatalogUrl(mesa)} size={100} />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{mesa === 0 ? 'Balcão' : `Mesa ${mesa}`}</span>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modo de Operação (Local)</label>
+                                <div className="space-y-3">
+                                    <button 
+                                        onClick={() => { setPermitirPedidoMesa(true); setModoCatalogoMesa(false); }}
+                                        className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${permitirPedidoMesa && !modoCatalogoMesa ? 'border-indigo-500 bg-white shadow-lg' : 'border-gray-100 bg-white/50 opacity-60'}`}
+                                    >
+                                        <div className="text-left">
+                                            <p className="font-black text-xs uppercase italic tracking-tight text-gray-900">Pedido por QR Code</p>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase">Clientes pedem diretamente da mesa</p>
+                                        </div>
+                                        <CheckCircle2 size={20} className={permitirPedidoMesa && !modoCatalogoMesa ? 'text-indigo-500' : 'text-gray-200'} />
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { setPermitirPedidoMesa(false); setModoCatalogoMesa(true); }}
+                                        className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${modoCatalogoMesa ? 'border-orange-500 bg-white shadow-lg' : 'border-gray-100 bg-white/50 opacity-60'}`}
+                                    >
+                                        <div className="text-left">
+                                            <p className="font-black text-xs uppercase italic tracking-tight text-gray-900">Apenas Visualização</p>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase">Código serve apenas como cardápio digital</p>
+                                        </div>
+                                        <Eye size={20} className={modoCatalogoMesa ? 'text-orange-500' : 'text-gray-200'} />
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { setPermitirPedidoMesa(false); setModoCatalogoMesa(false); }}
+                                        className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${!permitirPedidoMesa && !modoCatalogoMesa ? 'border-gray-900 bg-white shadow-lg' : 'border-gray-100 bg-white/50 opacity-60'}`}
+                                    >
+                                        <div className="text-left">
+                                            <p className="font-black text-xs uppercase italic tracking-tight text-gray-900">Desativar QR Codes</p>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase">Usa apenas o link de Delivery/Entrega</p>
+                                        </div>
+                                        <X size={20} className={!permitirPedidoMesa && !modoCatalogoMesa ? 'text-gray-900' : 'text-gray-200'} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Configuração Dinâmica baseada no Modo */}
+                            {modoCatalogoMesa && (
+                                <div className="space-y-4 animate-slide-up">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Acesso Rápido</label>
+                                    <div className="bg-white p-6 rounded-xl border border-gray-100 flex flex-col items-center gap-4">
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase text-center">No modo visualização, todas as mesas usam o mesmo código.</p>
+                                        <button 
+                                            onClick={() => { setShowQRs(true); }} 
+                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-orange-600/20 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <QrCode size={16} />
+                                            Gerar QR Code Cardápio Digital
+                                        </button>
                                     </div>
-                                ))}
+                                </div>
+                            )}
+
+                            {permitirPedidoMesa && !modoCatalogoMesa && (
+                                <div className="space-y-4 animate-slide-up">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Configurar Mesas</label>
+                                    <div className="bg-white p-6 rounded-xl border border-gray-100 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-gray-600 uppercase">Quantidade de Mesas</span>
+                                            <input 
+                                                type="number" 
+                                                value={quantidadeMesas} 
+                                                min={1}
+                                                onChange={(e) => setQuantidadeMesas(Math.max(1, parseInt(e.target.value) || 0))} 
+                                                className="w-20 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-center font-black" 
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={() => setShowQRs(true)} 
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <QrCode size={16} />
+                                            Gerar QR Code de cada Mesa
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {showQRs && (permitirPedidoMesa || modoCatalogoMesa) && (
+                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100 max-h-[400px] overflow-y-auto custom-scrollbar shadow-inner">
+                                {modoCatalogoMesa ? (
+                                    <div className="bg-white p-6 rounded-2xl flex flex-col items-center gap-4 shadow-sm border border-orange-100 hover:border-orange-300 transition-all group col-span-full max-w-sm mx-auto">
+                                        <div className="bg-orange-50 p-6 rounded-xl group-hover:bg-white transition-colors">
+                                            <QRCode value={getCatalogUrl(0)} size={200} />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Cardápio Digital Geral</span>
+                                            <p className="text-sm font-black italic uppercase tracking-tighter text-gray-900">Apenas Visualização</p>
+                                        </div>
+                                        <div className="w-full space-y-2">
+                                            <p className="text-[8px] text-gray-400 font-mono break-all text-center bg-gray-50 p-2 rounded-lg">{getCatalogUrl(0)}</p>
+                                            <button 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(getCatalogUrl(0));
+                                                    alert('Link copiado!');
+                                                }}
+                                                className="w-full py-2 bg-gray-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-colors"
+                                            >
+                                                Copiar Link
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    Array.from({ length: quantidadeMesas }, (_, i) => i + 1).map(mesa => (
+                                        <div key={mesa} className="bg-white p-4 rounded-xl flex flex-col items-center gap-3 shadow-sm border border-gray-100 hover:border-indigo-200 transition-all group">
+                                            <div className="bg-gray-50 p-3 rounded-lg group-hover:bg-white transition-colors">
+                                                <QRCode value={getCatalogUrl(mesa)} size={120} />
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-indigo-600 transition-colors italic">Mesa {mesa}</span>
+                                            </div>
+                                            <div className="w-full space-y-2">
+                                                <p className="text-[7px] text-gray-300 font-mono break-all text-center truncate">{getCatalogUrl(mesa)}</p>
+                                                <button 
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(getCatalogUrl(mesa));
+                                                        alert(`Link da Mesa ${mesa} copiado!`);
+                                                    }}
+                                                    className="w-full py-1.5 bg-gray-100 text-gray-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"
+                                                >
+                                                    Copiar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                            </div>
                         )}
                     </div>

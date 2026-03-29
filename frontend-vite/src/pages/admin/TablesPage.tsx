@@ -77,34 +77,42 @@ const TablesPage = () => {
 
             <main className="p-4 sm:p-6">
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2 sm:gap-4">
-                    {Array.from({ length: totalTables }, (_, i) => i + 1).map(num => {
-                        const status = getMesaStatus(num);
-                        const isOccupied = !!status;
+                    {(() => {
+                        const tableNumbers = new Set(Array.from({ length: totalTables }, (_, i) => i + 1));
+                        mesas.forEach(m => {
+                            const n = parseInt(m.mesa);
+                            if (!isNaN(n)) tableNumbers.add(n);
+                        });
+                        
+                        return Array.from(tableNumbers).sort((a, b) => a - b).map(num => {
+                            const status = getMesaStatus(num);
+                            const isOccupied = !!status;
 
-                        return (
-                            <button
-                                key={num}
-                                onClick={() => navigate(`/mesas/${num}`)}
-                                className={`relative aspect-square rounded-xl sm:rounded-xl border-2 transition-all p-1 sm:p-4 flex flex-col items-center justify-center gap-0.5 sm:gap-2 group ${isOccupied
-                                    ? 'bg-red-50 border-red-200 shadow-lg shadow-red-500/10'
-                                    : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl'
-                                    }`}
-                            >
-                                <div className={`w-6 h-6 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-0 sm:mb-1 ${isOccupied ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                    <span className="text-xs sm:text-xl font-black">{num}</span>
-                                </div>
-                                <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-widest ${isOccupied ? 'text-red-600' : 'text-gray-300'}`}>
-                                    {isOccupied ? 'Ocupada' : 'Livre'}
-                                </span>
-                                {isOccupied && (
-                                    <div className="mt-0 sm:mt-1 text-center leading-tight">
-                                        <p className="text-[8px] sm:text-sm font-black text-gray-800">R$ {status.total.toFixed(0)}</p>
-                                        <p className="text-[6px] sm:text-[9px] font-bold text-gray-400 uppercase">{status.itens_count} it</p>
+                            return (
+                                <button
+                                    key={num}
+                                    onClick={() => navigate(`/mesas/${num}`)}
+                                    className={`relative aspect-square rounded-xl sm:rounded-xl border-2 transition-all p-1 sm:p-4 flex flex-col items-center justify-center gap-0.5 sm:gap-2 group ${isOccupied
+                                        ? 'bg-red-50 border-red-200 shadow-lg shadow-red-500/10'
+                                        : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl'
+                                        }`}
+                                >
+                                    <div className={`w-6 h-6 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-0 sm:mb-1 ${isOccupied ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                        <span className="text-xs sm:text-xl font-black">{num}</span>
                                     </div>
-                                )}
-                            </button>
-                        );
-                    })}
+                                    <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-widest ${isOccupied ? 'text-red-600' : 'text-gray-300'}`}>
+                                        {isOccupied ? 'Ocupada' : 'Livre'}
+                                    </span>
+                                    {isOccupied && (
+                                        <div className="mt-0 sm:mt-1 text-center leading-tight">
+                                            <p className="text-[8px] sm:text-sm font-black text-gray-800">R$ {status.total.toFixed(0)}</p>
+                                            <p className="text-[6px] sm:text-[9px] font-bold text-gray-400 uppercase">{status.itens_count} it</p>
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        });
+                    })()}
                 </div>
             </main>
 

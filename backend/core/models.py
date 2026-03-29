@@ -111,7 +111,9 @@ class ConfiguracaoLoja(models.Model):
     notificar_cancelado = models.BooleanField(default=True, help_text="Notificar cliente quando o pedido for cancelado")
     
     # QR Code & Catalog Features
-    modo_catalogo = models.BooleanField(default=False, help_text="Se ativado, o cardápio funcionará apenas para visualização")
+    modo_catalogo = models.BooleanField(default=False, help_text="Cardápio Delivery apenas visualização")
+    permitir_pedido_mesa = models.BooleanField(default=False, help_text="Habilitar pedidos via QR Code nas mesas")
+    modo_catalogo_mesa = models.BooleanField(default=False, help_text="Cardápio Mesa apenas visualização")
     quantidade_mesas = models.PositiveIntegerField(default=0, help_text="Número de mesas para geração de QR Codes")
 
     msg_recebido = models.TextField(

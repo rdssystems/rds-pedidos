@@ -13,6 +13,7 @@ import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import PublicMenuPage from '@/pages/PublicMenuPage';
+import PublicTablePage from '@/pages/PublicTablePage';
 import PublicOrdersPage from '@/pages/PublicOrdersPage';
 import DashboardPage from '@/pages/admin/DashboardPage';
 import OrdersPage from '@/pages/admin/OrdersPage';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
                         <CartProvider>
                             <Routes>
                                 <Route path="/" element={<PublicMenuPage />} />
+                                <Route path="/m/:mesaNumber" element={<PublicTablePage />} />
                                 <Route path="/orders" element={<PublicOrdersPage />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
@@ -73,6 +75,7 @@ const App: React.FC = () => {
                             
                             {/* Slug fallback for local testing: localhost:5173/s/loja1 */}
                             <Route path="/s/:slug" element={<PublicMenuPage />} />
+                            <Route path="/s/:slug/m/:mesaNumber" element={<PublicTablePage />} />
                             <Route path="/s/:slug/orders" element={<PublicOrdersPage />} />
                             
                             {/* Protected Routes */}

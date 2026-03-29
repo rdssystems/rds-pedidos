@@ -440,16 +440,17 @@ export default function PublicMenuPage() {
                                     {store.nome}
                                 </h1>
                                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                                    <button 
-                                        onClick={() => setIsDeliveryModalOpen(true)}
-                                        className="bg-gray-50 hover:bg-white hover:ring-1 hover:ring-gray-200 text-gray-600 border border-gray-100 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all"
-                                    >
-                                        Calculadora de entrega
-                                    </button>
-                                    <div className="bg-green-50 text-green-700 border border-green-100 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                        Entrega e Retirada
-                                    </div>
+                                    {isOpenStatus.open ? (
+                                        <div className="bg-green-50 text-green-700 border border-green-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                            Recebendo Pedidos Agora
+                                        </div>
+                                    ) : (
+                                        <div className="bg-red-50 text-red-700 border border-red-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                            Loja Fechada
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

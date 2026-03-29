@@ -184,16 +184,29 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
             'categorias', 'bairros_entrega',
             'bot_ativo_whatsapp', 'bot_personalidade', 'bot_conhecimento', 'bot_alerta_transbordo',
-            'modo_catalogo', 'quantidade_mesas', 'caixa_aberto'
+            'modo_catalogo', 'quantidade_mesas', 'permitir_pedido_mesa', 'modo_catalogo_mesa', 'caixa_aberto', 'pedidos_pendentes'
         ]
 
+    def validate_quantidade_mesas(self, value):
+        if self.instance and self.instance.quantidade_mesas != value:
+            from .models import Pedido
+            active_orders = Pedido.objects.filter(loja=self.instance).exclude(status__in=['FINALIZADO', 'CANCELADO']).exists()
+            if active_orders:
+                raise serializers.ValidationError("Não é possível alterar a quantidade de mesas enquanto houver pedidos ativos.")
+        return value
+
     caixa_aberto = serializers.SerializerMethodField()
+    pedidos_pendentes = serializers.SerializerMethodField()
 
     def get_caixa_aberto(self, obj):
         # We need to import Caixa here to avoid circular imports if any, 
         # though it's already imported at the top.
         from .models import Caixa
         return Caixa.objects.filter(loja=obj, status='ABERTO').exists()
+
+    def get_pedidos_pendentes(self, obj):
+        from .models import Pedido
+        return Pedido.objects.filter(loja=obj).exclude(status__in=['FINALIZADO', 'CANCELADO']).count()
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
     produto_obj = ProdutoSerializer(source='produto', read_only=True)

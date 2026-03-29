@@ -221,6 +221,12 @@ class StoreViewSet(viewsets.ModelViewSet):
                 permission_classes.append(HasActiveSubscription)
         else: permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+    def partial_update(self, request, *args, **kwargs):
+        print(f"DEBUG: PATCH Data received: {request.data}", flush=True)
+        res = super().partial_update(request, *args, **kwargs)
+        print(f"DEBUG: Response data: {res.data}", flush=True)
+        return res
+
     def get_queryset(self):
         if self.action in ['list', 'update', 'partial_update', 'destroy']:
             if self.request.user.is_authenticated:
@@ -803,17 +809,27 @@ class PedidoViewSet(viewsets.ModelViewSet):
             if not (is_owner or is_generic_staff):
                 queryset = queryset.filter(status__in=['PRONTO', 'DESPACHADO'])
 
+        include_all_pending = self.request.query_params.get('include_pending') == 'true'
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
 
-        if start_date:
-            dt = parse_datetime(start_date)
-            if dt:
-                queryset = queryset.filter(criado_em__gte=dt)
-        if end_date:
-            dt = parse_datetime(end_date)
-            if dt:
-                queryset = queryset.filter(criado_em__lte=dt)
+        if start_date or end_date:
+            from django.db.models import Q
+            date_filter = Q()
+            if start_date:
+                dt = parse_datetime(start_date)
+                if dt: date_filter &= Q(criado_em__gte=dt)
+            if end_date:
+                dt = parse_datetime(end_date)
+                if dt: date_filter &= Q(criado_em__lte=dt)
+            
+            if include_all_pending:
+                # Inclui pedidos no intervalo OU qualquer pedido que não esteja finalizado/cancelado
+                queryset = queryset.filter(
+                    date_filter | ~Q(status__in=['FINALIZADO', 'CANCELADO'])
+                )
+            else:
+                queryset = queryset.filter(date_filter)
         
         tipo = self.request.query_params.get('tipo')
         if tipo:
@@ -939,6 +955,22 @@ class CaixaViewSet(viewsets.ModelViewSet):
              return Response(CaixaSerializer(caixa).data)
         return Response(None) # No open shift
 
+    @action(detail=True, methods=['get'])
+    def blocking_orders(self, request, pk=None):
+        caixa = self.get_object()
+        pending_orders_qs = Pedido.objects.filter(loja=caixa.loja).exclude(status__in=['FINALIZADO', 'CANCELADO'])
+        from .serializers import PedidoSerializer
+        serializer = PedidoSerializer(pending_orders_qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def force_finalize_all(self, request, pk=None):
+        caixa = self.get_object()
+        pending_orders_qs = Pedido.objects.filter(loja=caixa.loja).exclude(status__in=['FINALIZADO', 'CANCELADO'])
+        count = pending_orders_qs.count()
+        pending_orders_qs.update(status='FINALIZADO')
+        return Response({'success': True, 'count_finalized': count})
+
     @action(detail=True, methods=['post'])
     def fechar(self, request, pk=None):
         caixa = self.get_object()
@@ -955,9 +987,15 @@ class CaixaViewSet(viewsets.ModelViewSet):
 
         # Restriction: Block if there are ANY pending orders (NOVO, PREPARO, DESPACHADO)
         # We exclude FINALIZADO and CANCELADO
-        pending_orders = Pedido.objects.filter(loja=caixa.loja).exclude(status__in=['FINALIZADO', 'CANCELADO']).count()
+        pending_orders_qs = Pedido.objects.filter(loja=caixa.loja).exclude(status__in=['FINALIZADO', 'CANCELADO'])
+        pending_orders = pending_orders_qs.count()
         if pending_orders > 0:
-            return Response({'error': f'Não é possível fechar o caixa. Existem {pending_orders} pedidos pendentes.'}, status=400)
+            # Pega alguns exemplos para ajudar o usuário a encontrar
+            exemplos = list(pending_orders_qs.values_list('id', flat=True)[:5])
+            exemplos_str = ", ".join([f"#{ex}" for ex in exemplos])
+            return Response({
+                'error': f'Não é possível fechar o caixa. Existem {pending_orders} pedidos pendentes (Ex: {exemplos_str}). Verifique se há pedidos antigos não finalizados no Kanban ou Mesas.'
+            }, status=400)
 
         saldo_informado = request.data.get('saldo_final')
         if saldo_informado is None:
