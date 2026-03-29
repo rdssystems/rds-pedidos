@@ -16,6 +16,7 @@ import {
     AlertTriangle,
     Menu,
     X,
+    Bell,
 } from 'lucide-react';
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -31,6 +32,9 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     const [isMinimized, setIsMinimized] = React.useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [closingAlert, setClosingAlert] = React.useState<string | null>(null);
+    const [notifications, setNotifications] = React.useState<any[]>([]);
+    const [isNotifOpen, setIsNotifOpen] = React.useState(false);
+    const notifRef = React.useRef<HTMLDivElement>(null);
 
     // Close mobile menu on navigation
     React.useEffect(() => {
@@ -45,6 +49,52 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             setUserRoles(user.roles.map(r => r.role));
         }
     }, [user]);
+
+    React.useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/notificacoes-sistema/', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    // Filter unread notifications
+                    setNotifications(data.filter((n: any) => !n.lida));
+                }
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+            }
+        };
+
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Close notifications on click outside
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setIsNotifOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleMarkLida = async (id: number) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`/api/notificacoes-sistema/${id}/marcar-lida/`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    };
 
     React.useEffect(() => {
         if (!store?.horario_funcionamento) return;
@@ -344,8 +394,82 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-h-screen md:h-screen overflow-hidden">
+                {/* Header / Top Bar */}
+                <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 relative z-[50]">
+                    <div className="flex items-center gap-4">
+                        <div className="md:hidden w-8 h-8 bg-primary/10 rounded flex items-center justify-center text-primary font-bold">
+                            {store?.nome?.[0]}
+                        </div>
+                        <h2 className="hidden md:block text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            {menuItems.find(item => item.href === pathname)?.label || 'Gestão'}
+                        </h2>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {/* Notification Bell */}
+                        <div className="relative" ref={notifRef}>
+                            <button 
+                                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                className={`p-2 rounded-lg transition-all relative ${isNotifOpen ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
+                            >
+                                <Bell size={20} />
+                                {notifications.length > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center ring-2 ring-white animate-bounce">
+                                        {notifications.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Notifications Dropdown */}
+                            {isNotifOpen && (
+                                <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 py-4 animate-slide-up z-[60]">
+                                    <div className="px-4 pb-3 border-b border-gray-50 flex justify-between items-center">
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-900">Notificações</h3>
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{notifications.length} novas</span>
+                                    </div>
+                                    <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                                        {notifications.length > 0 ? (
+                                            notifications.map((n) => (
+                                                <div key={n.id} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors group relative">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <p className="text-[11px] font-bold text-gray-900 leading-tight">{n.titulo}</p>
+                                                        <button 
+                                                            onClick={() => handleMarkLida(n.id)}
+                                                            className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                                                            title="Marcar como lida"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 leading-relaxed pr-4">{n.mensagem}</p>
+                                                    <span className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter mt-2 block">
+                                                        {new Date(n.criado_em).toLocaleString('pt-BR')}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-12 text-center opacity-20">
+                                                <Bell size={40} className="mx-auto mb-2" />
+                                                <p className="text-[10px] font-bold uppercase tracking-widest">Sem notificações</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* User Profile Info (Compact) */}
+                        <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-gray-100">
+                            <div className="text-right">
+                                <p className="text-[11px] font-bold text-gray-900 leading-none">{user?.first_name || 'Admin'}</p>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{getRoleLabel()}</p>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
                 {closingAlert && (
-                    <div className="bg-orange-500 text-white px-4 py-3 flex items-center justify-center gap-3 font-bold text-sm shadow-md z-50 animate-slide-down sticky top-0 md:relative">
+                    <div className="bg-orange-500 text-white px-4 py-3 flex items-center justify-center gap-3 font-bold text-sm shadow-md z-40 animate-slide-down sticky top-0">
                         <AlertTriangle size={18} className="animate-pulse" />
                         <span>{closingAlert}</span>
                         <Link to="/pos" className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors ml-4 uppercase tracking-widest hidden sm:block">

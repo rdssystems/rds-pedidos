@@ -43,7 +43,6 @@ export default function DashboardPage() {
     const [chartData, setChartData] = React.useState<any[]>([]);
     const [topProducts, setTopProducts] = React.useState<any[]>([]);
     const [recentOrders, setRecentOrders] = React.useState<any[]>([]);
-    const [notifications, setNotifications] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
 
     const fetchStats = async () => {
@@ -81,7 +80,6 @@ export default function DashboardPage() {
                 setChartData(data.chart_data || []);
                 setTopProducts(data.top_products || []);
                 setRecentOrders(data.recent_orders || []);
-                if (data.notificacoes) setNotifications(data.notificacoes);
             }
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
@@ -107,27 +105,6 @@ export default function DashboardPage() {
         { label: 'Saldo em Caixa', value: formatCurrency(stats.saldo_caixa || 0), icon: Banknote, color: 'text-purple-500', bg: 'bg-purple-500/10' },
     ];
 
-    const handleDismissNotification = async (notifId: number) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/notificacoes-sistema/${notifId}/marcar-lida/`, {
-                method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json' 
-                }
-            });
-            
-            if (response.ok) {
-                // Update local state to remove it immediately
-                setNotifications(prev => prev.filter(n => n.id !== notifId));
-            } else {
-                console.error('Failed to dismiss notification:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error dismissing notification:', error);
-        }
-    };
 
     return (
         <div className="p-4 md:p-8 space-y-8 w-full relative min-h-screen bg-transparent">
@@ -159,31 +136,6 @@ export default function DashboardPage() {
                 </div>
             </header>
 
-            {notifications.length > 0 && (
-                <div className="space-y-3 z-10 relative">
-                    {notifications.map((notif: any) => (
-                        <div key={notif.id} className="bg-blue-50/80 backdrop-blur-md border border-blue-200 p-4 rounded-lg flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 group/notif">
-                            <div className="bg-blue-500 text-white p-2 rounded-full shrink-0">
-                                <AlertCircle size={20} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex justify-between items-start">
-                                    <h4 className="font-bold text-blue-900 text-sm">{notif.titulo}</h4>
-                                    <button 
-                                        onClick={() => handleDismissNotification(notif.id)}
-                                        className="text-blue-300 hover:text-blue-600 p-1 rounded-md transition-colors"
-                                        title="Marcar como lida"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                                <p className="text-blue-700 text-xs mt-1 leading-relaxed">{notif.mensagem}</p>
-                                <p className="text-blue-400 text-[10px] mt-2 font-medium uppercase tracking-widest">{new Date(notif.criado_em).toLocaleString('pt-BR')}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
 
             {period === 'custom' && (
                 <div className="bg-white/40 backdrop-blur-2xl p-6 rounded-xl shadow-2xl shadow-gray-100/50 border border-white/60 flex flex-wrap items-end gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
