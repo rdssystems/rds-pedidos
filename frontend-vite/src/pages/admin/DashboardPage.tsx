@@ -110,12 +110,20 @@ export default function DashboardPage() {
     const handleDismissNotification = async (notifId: number) => {
         try {
             const token = localStorage.getItem('token');
-            await fetch(`/api/notificacoes-sistema/${notifId}/marcar-lida/`, {
+            const response = await fetch(`/api/notificacoes-sistema/${notifId}/marcar-lida/`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json' 
+                }
             });
-            // Update local state to remove it immediately
-            setNotifications(prev => prev.filter(n => n.id !== notifId));
+            
+            if (response.ok) {
+                // Update local state to remove it immediately
+                setNotifications(prev => prev.filter(n => n.id !== notifId));
+            } else {
+                console.error('Failed to dismiss notification:', await response.text());
+            }
         } catch (error) {
             console.error('Error dismissing notification:', error);
         }
