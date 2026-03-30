@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChefHat, ArrowRight, CheckCircle2, LayoutDashboard, ShoppingBag, UtensilsCrossed, Smartphone, Check, Zap, CreditCard, Users, Bike, TrendingUp, DollarSign, Clock, HelpCircle } from 'lucide-react';
+import { ChefHat, ArrowRight, CheckCircle2, LayoutDashboard, ShoppingBag, UtensilsCrossed, Smartphone, Check, Zap, CreditCard, Users, Bike, TrendingUp, DollarSign, Clock, HelpCircle, Sparkles, X, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -15,7 +15,7 @@ export default function LandingPage() {
 
   const monthlyRevenue = ordersPerDay * avgTicket * 30;
   const deliveryAppsCost = monthlyRevenue * (commissionRate / 100);
-  const rdsCost = 129.90; // PRO Plan
+  const rdsCost = 149.90; // PRO Plan
   const savings = deliveryAppsCost - rdsCost;
 
   // Lista de imagens do carrossel. 
@@ -38,6 +38,75 @@ export default function LandingPage() {
 
     return () => clearInterval(interval);
   }, [carouselImages.length]);
+
+  // Quiz State
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [quizResult, setQuizResult] = useState<any>(null);
+
+  const QUESTIONS = [
+    {
+      id: 'desafio',
+      title: 'Qual o seu maior desafio?',
+      options: [
+        { id: 'whatsapp', label: 'Pedidos no WhatsApp', desc: 'Perco tempo anotando manual.', icon: MessageSquare },
+        { id: 'balcao', label: 'Caixa e Balcão', desc: 'Contas não batem no fim do dia.', icon: CreditCard },
+        { id: 'mesa', label: 'Gestão de Mesas', desc: 'Garçons e comandas desorganizados.', icon: UtensilsCrossed },
+      ]
+    },
+    {
+      id: 'espaco',
+      title: 'Como é seu espaço físico?',
+      options: [
+        { id: 'balcao', label: 'Apenas Balcão', desc: 'Atendimento rápido e retirada.', icon: ShoppingBag },
+        { id: 'salao', label: 'Tenho Salão/Mesas', desc: 'Atendimento tradicional com garçom.', icon: LayoutDashboard },
+        { id: 'delivery', label: 'Foco em Delivery', desc: 'Produção para entrega externa.', icon: Bike },
+      ]
+    },
+    {
+      id: 'volume',
+      title: 'Quantos pedidos por dia?',
+      options: [
+        { id: 'low', label: 'Até 20 pedidos', desc: 'Estou começando agora.', icon: Zap },
+        { id: 'mid', label: 'De 20 a 100 pedidos', desc: 'Preciso de automação.', icon: TrendingUp },
+        { id: 'high', label: 'Mais de 100 pedidos', desc: 'Preciso de robustez total.', icon: ChefHat },
+      ]
+    },
+    {
+      id: 'equipe',
+      title: 'Possui equipe de campo?',
+      options: [
+        { id: 'garcom', label: 'Tenho Garçons', desc: 'Pedidos direto na mesa.', icon: Users },
+        { id: 'motoboy', label: 'Tenho Motoboys', desc: 'Controle de entregas.', icon: Bike },
+        { id: 'sozinho', label: 'Foco no Balcão', desc: 'Minha equipe é reduzida.', icon: CheckCircle2 },
+      ]
+    }
+  ];
+
+  const handleQuizAnswer = (qId: string, oId: string) => {
+    const newAnswers = { ...answers, [qId]: oId };
+    setAnswers(newAnswers);
+    if (currentStep < QUESTIONS.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Logic for Result
+      if (newAnswers.espaco === 'salao' || newAnswers.equipe === 'garcom') {
+        setQuizResult({ name: 'Plano COMPLETO (Gold)', desc: 'Gestão de mesas, garçons, delivery e PDV. Ideal para seu restaurante físico.' });
+      } else if (newAnswers.desafio === 'whatsapp' || newAnswers.espaco === 'delivery' || newAnswers.equipe === 'motoboy') {
+        setQuizResult({ name: 'Plano DELIVERY (Silver)', desc: 'Foco em Kanban de pedidos, WhatsApp e automação de entregas.' });
+      } else {
+        setQuizResult({ name: 'Plano CAIXA (Bronze)', desc: 'Agilidade total no balcão e controle financeiro essencial.' });
+      }
+    }
+  };
+
+  const closeQuiz = () => {
+    setIsQuizOpen(false);
+    setCurrentStep(0);
+    setAnswers({});
+    setQuizResult(null);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 selection:bg-red-500 selection:text-white">
@@ -75,18 +144,21 @@ export default function LandingPage() {
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter leading-[1.1] mb-6">
             O coração do seu <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-600">
-              negócio gastronômico.
+              negócio.
             </span>
           </h1>
           <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Painel Kanban em tempo real, pedidos via WhatsApp automatizados, cardápio digital completo e PDV para o caixa. Tudo num só lugar.
+            Esqueça cadernos e confusão no WhatsApp. Centralize PDV, Mesas e Delivery em um só lugar com o rDs Pedidos.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="https://app.rdspedidos.com.br/register" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-red-500 text-white px-8 py-4 rounded-full font-bold text-base hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/30 transition-all active:scale-95">
-              Comece agora grátis <ArrowRight size={20} />
-            </a>
-            <a href="#recursos" className="w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95">
-              Ver recursos
+            <button 
+              onClick={() => setIsQuizOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-red-500 text-white px-8 py-4 rounded-full font-bold text-base hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/30 transition-all active:scale-95 animate-pulse"
+            >
+              Descobrir meu Plano Ideal <Sparkles size={18} className="ml-1" />
+            </button>
+            <a href="https://app.rdspedidos.com.br/register" className="w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95">
+              Criar Loja Grátis
             </a>
           </div>
         </div>
@@ -147,69 +219,69 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <LayoutDashboard size={28} />
+            {/* Feature 1 - Kanban */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <LayoutDashboard size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Kanban de Pedidos</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Acompanhe cada pedido em tempo real. De "Novo" até "Entregue", com alertas sonoros e indicadores de atraso visuais.
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">Gestão em Tempo Real</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Sincronização via <span className="text-red-500 font-bold">WebSockets</span>. Seus pedidos aparecem na tela no mesmo segundo em que o cliente clica, com alertas sonoros e visuais.
               </p>
             </div>
 
-            {/* Feature 2 */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <Smartphone size={28} />
+            {/* Feature 2 - WhatsApp AI */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <Zap size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Automação WhatsApp</h3>
-              <p className="text-slate-600 leading-relaxed">
-                O cliente faz o pedido no cardápio digital e o sistema notifica o WhatsApp dele a cada passo (preparando, a caminho, etc).
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">WhatsApp com IA</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Atendimento inteligente que responde dúvidas e envia o link do cardápio automaticamente. Economize horas de chat manual todos os dias.
               </p>
             </div>
 
-            {/* Feature 3 */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <UtensilsCrossed size={28} />
+            {/* Feature 3 - Mesa/QR Code */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <UtensilsCrossed size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Cardápio Inteligente</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Cardápio digital bonito, rápido e que não trava. Com controle de complementos, variáveis, taxas de entrega e busca em tempo real.
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">Mesa & Comanda Digital</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Seus clientes pedem direto do QR Code na mesa. O pedido vai direto para a cozinha e para o caixa, sem depender de garçom o tempo todo.
               </p>
             </div>
 
-            {/* Feature 4 - New */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <CreditCard size={28} />
+            {/* Feature 4 - PDV Interno */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <ShoppingBag size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Caixa e PDV Completo</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Sistema de PDV integrado para vendas de balcão. Abertura e fechamento de caixa, sangria, suprimento e relatórios financeiros em segundos.
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">PDV de Balcão Blindado</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Controle total de entradas, saídas, fechamento de caixa e sangrias. Um terminal de vendas rápido, bonito e que nunca te deixa na mão.
               </p>
             </div>
 
-            {/* Feature 5 - New */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <UtensilsCrossed size={28} />
+            {/* Feature 5 - Equipe/Garçons */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <Users size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Atendimento a Mesas</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Gestão de mesas e comandas simplificada. Seus garçons lançam pedidos direto pelo celular e a cozinha recebe instantaneamente.
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">WebApp para Garçons</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Transforme qualquer celular em uma ferramenta de trabalho. Garçons lançam pedidos à mesa com 3 cliques, eliminando erros de papel.
               </p>
             </div>
 
-            {/* Feature 6 - New */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-6">
-                <Bike size={28} />
+            {/* Feature 6 - Entregadores */}
+            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 hover:shadow-2xl hover:shadow-red-500/5 transition-all hover:-translate-y-2 group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm border border-slate-100 mb-8 group-hover:scale-110 transition-transform">
+                <Bike size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Controle de Entregadores</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Fim do caos no acerto! Contas específicas para cada entregador, calculando automaticamente as taxas de entrega e comissões devidas.
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase mb-4">Gestão de Entregadores</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Acerto de contas transparente. Saiba exatamente quanto cada motoboy deve e quanto ele tem a receber de taxa de entrega em tempo real.
               </p>
             </div>
           </div>
@@ -388,55 +460,61 @@ export default function LandingPage() {
             {/* Plan Start */}
             <div className="bg-slate-800/50 backdrop-blur-xl rounded-[2.5rem] p-10 border border-slate-700">
               <div className="mb-6">
-                <span className="text-sm font-bold tracking-widest uppercase text-slate-400">Essencial</span>
-                <h3 className="text-3xl font-black text-white mt-2">Start</h3>
+                <span className="text-sm font-bold tracking-widest uppercase text-slate-400">O Essencial</span>
+                <h3 className="text-3xl font-black text-white mt-2 italic uppercase">START</h3>
               </div>
-              <div className="mb-8 flex items-end gap-2">
+              <div className="mb-8 flex items-end gap-2 text-white">
                 <span className="text-slate-400 text-lg font-bold mb-1 mr-1">R$</span>
-                <span className="text-5xl font-black text-white tracking-tighter">49<span className="text-3xl">,90</span></span>
+                <span className="text-5xl font-black tracking-tighter italic">69<span className="text-3xl">,90</span></span>
                 <span className="text-slate-400 font-bold mb-1 pl-1">/mês</span>
               </div>
+              <p className="text-slate-400 text-sm font-medium mb-8 italic">Ideal para quem está começando a organizar sua operação.</p>
               <ul className="space-y-4 mb-10 text-slate-300">
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-slate-500" size={20} /> Cardápio Digital</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-slate-500" size={20} /> App PDV de Caixa</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-slate-500" size={20} /> Notificações WhatsApp</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="text-slate-500" size={20} /> Até 50 Produtos</li>
-                <li className="flex items-center gap-3 text-slate-500 line-through"><CheckCircle2 size={20} /> Painel Kanban</li>
-                <li className="flex items-center gap-3 text-slate-500 line-through"><CheckCircle2 size={20} /> Gestão de Mesas</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Cardápio Digital</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Cadastro de Produtos Ilimitado</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> 1 Conta de Equipe</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Suporte via E-mail</li>
+                <li className="flex items-center gap-3 text-slate-600/50"><CheckCircle2 size={18} /> Gestão de Pedidos (Kanban)</li>
+                <li className="flex items-center gap-3 text-slate-600/50"><CheckCircle2 size={18} /> Mesas e Comandas</li>
+                <li className="flex items-center gap-3 text-slate-600/50"><CheckCircle2 size={18} /> Integração iFood (Em breve)</li>
+                <li className="flex items-center gap-3 text-slate-600/50"><CheckCircle2 size={18} /> WhatsApp Bot</li>
               </ul>
-              <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-4 rounded-full font-bold text-white bg-slate-700 hover:bg-slate-600 transition-colors">
-                Começar Start
+              <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-4 rounded-full font-black text-white bg-slate-900 hover:bg-black transition-all active:scale-95 uppercase tracking-widest text-sm">
+                Começar Agora
               </a>
             </div>
 
             {/* Plan PRO */}
             <div className="relative bg-white rounded-[2.5rem] p-10 border-4 border-red-500 shadow-2xl shadow-red-500/20 transform md:-translate-y-4">
-              <div className="absolute top-0 right-10 -translate-y-1/2 bg-red-500 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
-                Mais Popular
+              <div className="absolute top-0 right-10 -translate-y-1/2 bg-red-500 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                Mais Desejado
               </div>
               <div className="mb-6">
-                <span className="text-sm font-bold tracking-widest uppercase text-red-500">Completo</span>
-                <h3 className="text-3xl font-black text-slate-900 mt-2">PRO</h3>
+                <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Completo</span>
+                <h3 className="text-4xl font-black text-slate-900 mt-2 italic uppercase tracking-tighter">PRO</h3>
               </div>
               <div className="mb-8 flex items-end gap-2">
                 <span className="text-slate-400 text-lg font-bold mb-1 mr-1">R$</span>
-                <span className="text-6xl font-black text-slate-900 tracking-tighter">129<span className="text-4xl">,90</span></span>
+                <span className="text-6xl font-black text-slate-900 tracking-tighter italic">149<span className="text-4xl">,90</span></span>
                 <span className="text-slate-500 font-bold mb-2 pl-1">/mês</span>
               </div>
-              <ul className="space-y-4 mb-10 text-slate-700 font-medium">
-                <li className="flex items-center gap-3 font-bold"><Check className="text-red-500" size={20} strokeWidth={3} /> Tudo do plano Start</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Painel Kanban</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Gestão de Mesas e Comandas</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Robô de WhatsApp com Google Gemini <Zap size={16} fill="currentColor" className="text-yellow-500" /></li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Especialista Financeiro com IA</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 10 Contas de Equipe</li>
-                <li className="flex items-center gap-3"><Check className="text-red-500" size={20} strokeWidth={3} /> Até 1000 Produtos</li>
-                <li className="flex items-center gap-3 text-slate-400"><Check size={20} /> Integração iFood (Em breve)</li>
+              <p className="text-slate-400 text-sm font-medium mb-8 italic">Potência total com automação e IA para restaurantes.</p>
+              <ul className="space-y-4 mb-10 text-slate-700 font-bold text-sm">
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Tudo do Plano Start</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Gestão de Pedidos (Kanban)</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Mesas e Comandas</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Integração iFood Oficial (Em breve)</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Atendente de I.A no WhatsApp</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Dashboard de BI (Analytics)</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Módulo Multi-lojas</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Gestão de Estoque Avançada</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Até 10 Contas de Equipe</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="text-green-500" size={18} /> Suporte Prioritário WhatsApp</li>
               </ul>
-              <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-4 rounded-full font-black text-white bg-red-500 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/40 transition-all active:scale-95 text-lg">
+              <a href="https://app.rdspedidos.com.br/register" className="block w-full text-center py-5 rounded-[1.5rem] font-black text-white bg-red-500 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/40 transition-all active:scale-95 uppercase tracking-widest">
                 Assinar o PRO
               </a>
-              <p className="text-center text-xs text-slate-500 font-bold mt-4 uppercase tracking-wider">7 Dias de Teste Grátis no PRO</p>
+              <p className="text-center text-[10px] text-slate-400 font-black mt-4 uppercase tracking-wider italic">7 Dias de Teste Grátis no PRO</p>
             </div>
 
           </div>
@@ -452,6 +530,65 @@ export default function LandingPage() {
         <p>&copy; {new Date().getFullYear()} RDS Pedidos. Todos os direitos reservados.</p>
         <p className="mt-2 text-sm text-slate-600">Simplificando o Delivery Brasileiro.</p>
       </footer>
+
+      {/* QUIZ MODAL */}
+      {isQuizOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={closeQuiz} />
+          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {!quizResult ? (
+              <div className="p-8 sm:p-12">
+                <div className="flex justify-between items-center mb-8">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-red-500 bg-red-50 px-3 py-1 rounded-full">Consultoria Grátis</span>
+                  <button onClick={closeQuiz} className="text-slate-300 hover:text-red-500 transition-colors"><X size={24} /></button>
+                </div>
+                
+                <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic uppercase leading-none mb-2">{QUESTIONS[currentStep].title}</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-8">Passo {currentStep + 1} de {QUESTIONS.length}</p>
+
+                <div className="grid gap-3">
+                  {QUESTIONS[currentStep].options.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleQuizAnswer(QUESTIONS[currentStep].id, opt.id)}
+                      className="group flex items-center gap-4 p-5 bg-slate-50 border border-slate-100 rounded-2xl text-left hover:bg-white hover:border-red-500 hover:shadow-xl hover:shadow-red-500/5 hover:scale-[1.02] transition-all"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 group-hover:text-red-500 transition-colors shrink-0">
+                        <opt.icon size={22} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[13px] font-black text-slate-900 uppercase italic tracking-tighter">{opt.label}</p>
+                        <p className="text-[10px] text-slate-400 font-bold leading-tight">{opt.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 sm:p-12 text-center flex flex-col items-center">
+                <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-2">Resultado da Consultoria:</h3>
+                <h2 className="text-3xl font-black italic tracking-tighter uppercase text-slate-900 mb-4">{quizResult.name}</h2>
+                <div className="mb-8 p-6 bg-slate-50 rounded-2xl text-left border border-slate-100">
+                  <p className="text-xs font-bold text-slate-500 leading-relaxed italic">"{quizResult.desc}"</p>
+                </div>
+                
+                <div className="w-full space-y-3">
+                  <a 
+                    href="https://app.rdspedidos.com.br/register"
+                    className="flex items-center justify-center w-full py-5 bg-red-500 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] transition-transform shadow-xl shadow-red-500/20"
+                  >
+                    Começar teste do {quizResult.name.split(' ')[1]}
+                  </a>
+                  <button onClick={closeQuiz} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900">Refazer simulação</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
