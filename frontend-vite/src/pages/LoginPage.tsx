@@ -17,7 +17,6 @@ export default function LoginPage() {
         setError('');
 
         try {
-            // Here we would call the Django login API
             const response = await fetch('/api/token/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -32,7 +31,6 @@ export default function LoginPage() {
                 setError('Credenciais inválidas.');
             }
         } catch (err) {
-            // Fallback for dev environment if API is not fully configured
             if (username === 'admin' && password === 'admin') {
                 login('dev-token');
                 navigate('/orders');
@@ -45,34 +43,31 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-900 relative overflow-hidden font-inter">
+        <div className="min-h-screen flex items-center justify-center bg-gray-950 relative overflow-hidden font-inter">
             {/* Background Image with Overlay */}
             <div className="absolute inset-0 z-0 scale-105 animate-slow-zoom">
                 <img 
                     src={`/login-bg.png?v=${new Date().getTime()}`} 
-                    className="w-full h-full object-cover opacity-40 brightness-[0.6] sepia-[0.2]" 
+                    className="w-full h-full object-cover opacity-40 brightness-[0.5]" 
                     alt="Background" 
                 />
-                <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 via-gray-900/40 to-primary/10"></div>
+                <div className="absolute inset-0 bg-gradient-to-tr from-black via-gray-900/40 to-primary/10"></div>
             </div>
 
-            {/* Abstract Background Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[150px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-[150px]"></div>
-
             <div className="z-10 w-full max-w-md p-8">
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+                <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 shadow-2xl">
                     <div className="flex flex-col items-center mb-10">
-                        <div className="w-32 h-32 mb-6 relative group">
-                            <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-500"></div>
+                        <div className="w-56 h-auto mb-2 relative group">
+                            <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all duration-500"></div>
                             <img
                                 src={`/logo-rds.png?v=${new Date().getTime()}`}
                                 alt="rDs Pedidos Logo"
                                 className="w-full h-full object-contain relative z-10 drop-shadow-2xl hover:scale-105 transition-transform duration-300"
                             />
                         </div>
-                        <h1 className="text-3xl font-black text-white italic tracking-tighter uppercase">rDs PEDIDOS</h1>
-                        <p className="text-gray-400 text-sm mt-2 font-medium tracking-wide">Gestão de Pedidos Inteligente</p>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em] italic brightness-125">
+                            Gestão de Pedidos Inteligente
+                        </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -138,17 +133,17 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-8 text-center space-y-4">
+                    <div className="mt-8 text-center space-y-4 border-t border-white/5 pt-8">
                         <p className="text-gray-400 text-sm">
                             Novo por aqui?{' '}
-                            <Link to="/register" className="text-primary font-bold hover:underline underline-offset-4">
+                            <Link to="/register" className="text-primary font-bold hover:underline underline-offset-4 transition-all">
                                 Criar conta e abrir minha loja
                             </Link>
                         </p>
                     </div>
 
                     <div className="mt-10 text-center">
-                        <p className="text-gray-500 text-xs text-opacity-40">
+                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest opacity-40">
                             © 2025 rDs Systems. Todos os direitos reservados.
                         </p>
                     </div>

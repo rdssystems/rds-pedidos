@@ -192,7 +192,7 @@ export default function PublicMenuPage() {
     }, [lastMessage, store]);
 
     const getImageUrl = (url: string | null) => {
-        if (!url) return '';
+        if (!url || url === '') return '/logo-perfil.png';
         
         // Se a busca encontrar um padrão de URL (http ou https)
         if (url.startsWith('http')) {

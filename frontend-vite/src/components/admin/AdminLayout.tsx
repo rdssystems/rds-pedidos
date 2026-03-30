@@ -222,11 +222,11 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                     >
                         <Menu size={24} />
                     </button>
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0 overflow-hidden">
+                    <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-white shadow-lg shrink-0 overflow-hidden border border-gray-100">
                         {store?.logo ? (
-                            <img src={`${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
+                            <img src={store.logo.includes('http') ? store.logo : `${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
                         ) : (
-                            store?.nome?.[0] || 'R'
+                            <img src="/logo-perfil.png" alt="Padrão" className="w-full h-full object-cover opacity-80" />
                         )}
                     </div>
                     <h1 className="text-base font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight line-clamp-2 max-w-[200px]">{store?.nome || 'Admin'}</h1>
@@ -267,11 +267,11 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className={`p-6 ${isMinimized ? 'px-4' : 'pb-4 p-8'}`}>
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-[#eef2ff] rounded-[8px] flex items-center justify-center text-[#4338ca] shadow-sm shrink-0 mx-auto font-black italic border border-[#c7d2fe]/20 overflow-hidden">
+                            <div className="w-9 h-9 bg-gray-50 rounded-[8px] flex items-center justify-center text-[#4338ca] shadow-sm shrink-0 mx-auto font-black italic border border-gray-200 overflow-hidden">
                                 {store?.logo ? (
-                                    <img src={`${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
+                                    <img src={store.logo.includes('http') ? store.logo : `${store.logo}?v=${new Date().getTime()}`} alt={store.nome} className="w-full h-full object-cover" />
                                 ) : (
-                                    store?.nome?.[0] || 'R'
+                                    <img src="/logo-perfil.png" alt="Padrão" className="w-full h-full object-cover opacity-80" />
                                 )}
                             </div>
                             {!isMinimized && (

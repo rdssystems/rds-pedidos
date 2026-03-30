@@ -56,6 +56,7 @@ export const BillingProvider = ({ children }: { children: ReactNode }) => {
             const s = Array.isArray(data) ? data[0] : (data.results ? data.results[0] : data);
 
             if (s) {
+                if (!s.logo) s.logo = '/logo-perfil.png';
                 setStore(s);
             }
         } catch (error) {
@@ -76,6 +77,11 @@ export const BillingProvider = ({ children }: { children: ReactNode }) => {
 
     const isPlan = (planName: string) => {
         return store?.plano_details?.nome === planName;
+    };
+
+    const getImageUrl = (url: string | null) => {
+        if (!url || url === '') return '/logo-perfil.png';
+        return url;
     };
 
     return (
