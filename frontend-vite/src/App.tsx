@@ -12,6 +12,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
+import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import PublicMenuPage from '@/pages/PublicMenuPage';
 import PublicTablePage from '@/pages/PublicTablePage';
 import PublicOrdersPage from '@/pages/PublicOrdersPage';
@@ -72,6 +73,7 @@ const App: React.FC = () => {
                             <Route path="/" element={<HomePage />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/verify-email" element={<VerifyEmailPage />} />
                             
                             {/* Slug fallback for local testing: localhost:5173/s/loja1 */}
                             <Route path="/s/:slug" element={<PublicMenuPage />} />
