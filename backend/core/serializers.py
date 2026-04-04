@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile, BairroEntrega, NotificacaoSistema
+from .models import Plano, ConfiguracaoLoja, Categoria, Produto, GrupoDeAtributos, AtributoOpcao, Pedido, ItemPedido, PerfilUsuarioLoja, Caixa, MovimentacaoCaixa, UserProfile, BairroEntrega, NotificacaoSistema, PerfilCliente
 
 import json
 
@@ -184,7 +184,8 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
             'categorias', 'bairros_entrega',
             'bot_ativo_whatsapp', 'bot_personalidade', 'bot_conhecimento', 'bot_alerta_transbordo',
-            'modo_catalogo', 'quantidade_mesas', 'permitir_pedido_mesa', 'modo_catalogo_mesa', 'caixa_aberto', 'pedidos_pendentes'
+            'modo_catalogo', 'quantidade_mesas', 'permitir_pedido_mesa', 'modo_catalogo_mesa', 'caixa_aberto', 'pedidos_pendentes',
+            'crm_dias_ausente', 'crm_msg_ausente'
         ]
 
     def validate_quantidade_mesas(self, value):
@@ -210,11 +211,20 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
     produto_obj = ProdutoSerializer(source='produto', read_only=True)
+    produto_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = ItemPedido
-        fields = '__all__'
+        fields = [
+            'id', 'pedido', 'produto', 'produto_obj', 'produto_nome',
+            'quantidade', 'preco_unitario', 'observacoes', 'selecoes'
+        ]
         extra_kwargs = {'pedido': {'required': False}}
+
+    def get_produto_nome(self, obj):
+        if obj.produto:
+            return obj.produto.nome
+        return None
 
 class PedidoSerializer(serializers.ModelSerializer):
     itens = ItemPedidoSerializer(many=True, required=False)
@@ -291,3 +301,9 @@ class NotificacaoSistemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificacaoSistema
         fields = '__all__'
+
+class PerfilClienteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PerfilCliente
+        fields = ['id', 'loja', 'whatsapp', 'nome', 'observacoes', 'criado_em', 'atualizado_em']
+        read_only_fields = ['id', 'loja', 'whatsapp', 'criado_em', 'atualizado_em']

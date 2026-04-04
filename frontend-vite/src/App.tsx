@@ -26,6 +26,7 @@ import TableDetailsPage from '@/pages/admin/TableDetailsPage';
 import SettingsPage from '@/pages/admin/SettingsPage';
 import TeamPage from '@/pages/admin/TeamPage';
 import BillingPage from '@/pages/admin/BillingPage';
+import CrmPage from '@/pages/admin/CrmPage';
 import IntegrationsLayout from '@/pages/admin/integrations/IntegrationsLayout';
 import WhatsAppPage from '@/pages/admin/integrations/WhatsAppPage';
 import AIBotPage from '@/pages/admin/integrations/AIBotPage';
@@ -91,7 +92,8 @@ const App: React.FC = () => {
                                                     <Route path="/dashboard" element={<DashboardPage />} />
                                                     <Route path="/orders" element={<OrdersPage />} />
                                                     <Route path="/pos" element={<PosPage />} />
-                                                    <Route path="/menu" element={<MenuPage />} />
+                                                     <Route path="/crm" element={<CrmPage />} />
+                                                     <Route path="/menu" element={<MenuPage />} />
                                                     <Route path="/menu/addons" element={<AddonsPage />} />
                                                     <Route path="/mesas" element={<TablesPage />} />
                                                     <Route path="/mesas/:id" element={<TableDetailsPage />} />

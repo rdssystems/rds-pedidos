@@ -18,7 +18,7 @@ export default function OrdersPage() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    if (loading) {
+    if (loading || !store) {
         return (
             <div className="h-full flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -26,7 +26,7 @@ export default function OrdersPage() {
         );
     }
 
-    if (!store || (store.status_assinatura !== 'active' && store.status_assinatura !== 'trial')) {
+    if (store.status_assinatura !== 'active' && store.status_assinatura !== 'trial') {
         return (
             <div className="h-full flex items-center justify-center p-6 bg-transparent">
                 <div className="max-w-md w-full bg-white rounded-xl p-8 shadow-xl border border-gray-100 text-center space-y-6">
@@ -50,7 +50,7 @@ export default function OrdersPage() {
         );
     }
 
-    if (store.plano_details?.nome === 'Basic' || isMobile) {
+    if (store.plano_tipo === 'START' || store.plano_details?.nome === 'Basic' || isMobile) {
         return <OrderListSimplified />;
     }
 

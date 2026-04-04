@@ -23,9 +23,9 @@ const plans = [
         color: 'blue',
         features: [
             'Cardápio Digital',
-            'Cadastro de Produtos Ilimitado',
-            '1 Conta de Equipe',
-            'Suporte via E-mail'
+            'Cadastre Até 20 Produtos',
+            '1 Conta de Equipe (Proprietário)',
+            'Suporte via WhatsApp'
         ],
         notIncluded: [
             'Gestão de Pedidos (Kanban)',

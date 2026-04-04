@@ -72,6 +72,7 @@ class ConfiguracaoLoja(models.Model):
     PLANO_CHOICES = [
         ('START', 'Plano Start'),
         ('PRO', 'Plano Pro'),
+        ('ELITE', 'Plano Elite'),
     ]
     plano_tipo = models.CharField(max_length=20, choices=PLANO_CHOICES, default='START')
     plano = models.ForeignKey(Plano, on_delete=models.SET_NULL, null=True, blank=True)
@@ -141,6 +142,15 @@ class ConfiguracaoLoja(models.Model):
         help_text="Variáveis: {cliente}, {numero}, {loja}"
     )
 
+    # CRM Settings
+    crm_dias_ausente = models.PositiveIntegerField(default=30, help_text="Dias sem pedir para considerar ausente")
+    crm_msg_ausente = models.TextField(
+        blank=True, 
+        null=True, 
+        default="Olá {cliente}! Sentimos sua falta em *{loja}*. Que tal um pedido hoje? 🍕",
+        help_text="Mensagem padrão para clientes ausentes. Variáveis: {cliente}, {loja}"
+    )
+
     def save(self, *args, **kwargs):
         if self.pk:
             old = ConfiguracaoLoja.objects.get(pk=self.pk)
@@ -152,6 +162,16 @@ class ConfiguracaoLoja(models.Model):
             if self.logo: resize_image(self.logo, (500, 500), quality=75)
             if self.banner: resize_image(self.banner, (1920, 1080), quality=80)
             
+        # Sincroniza o plano_tipo com o nome do plano se disponível
+        if self.plano:
+            nome_plano = self.plano.nome.upper()
+            if 'START' in nome_plano:
+                self.plano_tipo = 'START'
+            elif 'ELITE' in nome_plano:
+                self.plano_tipo = 'ELITE'
+            elif 'PRO' in nome_plano:
+                self.plano_tipo = 'PRO'
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -401,3 +421,19 @@ class NotificacaoSistema(models.Model):
 
     def __str__(self):
         return f"Notificação: {self.titulo} - Loja {self.loja.nome}"
+
+class PerfilCliente(models.Model):
+    loja = models.ForeignKey(ConfiguracaoLoja, on_delete=models.CASCADE, related_name='perfil_clientes')
+    whatsapp = models.CharField(max_length=20)
+    nome = models.CharField(max_length=255, blank=True, null=True)
+    observacoes = models.TextField(blank=True, null=True, help_text="Notas permanentes sobre este cliente")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('loja', 'whatsapp')
+        verbose_name = "Perfil do Cliente"
+        verbose_name_plural = "Perfis dos Clientes"
+
+    def __str__(self):
+        return f"{self.nome or self.whatsapp} ({self.loja.nome})"

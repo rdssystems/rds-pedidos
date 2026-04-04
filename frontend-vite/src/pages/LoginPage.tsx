@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Lock, User, Loader2, ChefHat } from 'lucide-react';
 
 export default function LoginPage() {
-    const [username, setUsername] = useState('');
+    const [username, setUsername] = useState(() => localStorage.getItem('last_email') || '');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -24,6 +24,9 @@ export default function LoginPage() {
             });
 
             if (response.ok) {
+                // Save last email
+                localStorage.setItem('last_email', username);
+                
                 const data = await response.json();
                 await login(data.access);
                 navigate('/orders');
@@ -95,7 +98,12 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Senha</label>
+                            <div className="flex items-center justify-between ml-1">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Senha</label>
+                                <button type="button" className="text-[10px] font-bold text-gray-500 uppercase hover:text-white transition-colors">
+                                    Esqueci minha senha
+                                </button>
+                            </div>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500 group-focus-within:text-primary transition-colors">
                                     <Lock size={18} />
@@ -104,23 +112,17 @@ export default function LoginPage() {
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-11 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+                                    className="block w-full pl-11 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono"
                                     placeholder="••••••••"
                                     required
                                 />
                             </div>
                         </div>
 
-                        <div className="flex justify-end pr-1">
-                            <Link to="/forgot-password" title="Esqueci minha senha" className="text-xs font-bold text-gray-500 hover:text-primary transition-colors">
-                                Esqueci minha senha
-                            </Link>
-                        </div>
-
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-gradient-to-r from-primary to-orange-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
+                            className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-green-500/20 hover:shadow-green-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
                         >
                             {loading ? (
                                 <Loader2 className="animate-spin" size={20} />
@@ -133,16 +135,10 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-8 text-center space-y-4 border-t border-white/5 pt-8">
-                        <p className="text-gray-400 text-sm">
-                            Novo por aqui?{' '}
-                            <Link to="/register" className="text-primary font-bold hover:underline underline-offset-4 transition-all">
-                                Criar conta e abrir minha loja
-                            </Link>
+                    <div className="mt-10 text-center space-y-4">
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                            Novo por aqui? <button onClick={() => navigate('/register')} className="text-green-500 hover:underline font-black outline-none">Criar conta e abrir minha loja</button>
                         </p>
-                    </div>
-
-                    <div className="mt-10 text-center">
                         <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest opacity-40">
                             © 2025 rDs Systems. Todos os direitos reservados.
                         </p>

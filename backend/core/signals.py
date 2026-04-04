@@ -33,24 +33,12 @@ def send_whatsapp_message(number, text, instance_name=None):
 
 @receiver(post_save, sender=Pedido)
 def notify_order_change(sender, instance, created, **kwargs):
+    from .serializers import PedidoSerializer
     channel_layer = get_channel_layer()
     
-    # Message to send to the group
-    order_num = instance.numero_diario or instance.id
-    message = {
-        'id': instance.id,
-        'numero_diario': instance.numero_diario,
-        'status': instance.status,
-        'cliente_nome': instance.cliente_nome,
-        'cliente_whatsapp': instance.cliente_whatsapp,
-        'total': str(instance.total),
-        'tipo': instance.tipo,
-        'endereco': instance.endereco,
-        'forma_pagamento': instance.forma_pagamento,
-        'observacoes': instance.observacoes,
-        'criado_em': instance.criado_em.isoformat() if instance.criado_em else None,
-        'is_new': created
-    }
+    # Use the serializer to get the same data format as the REST API (including itens)
+    message = PedidoSerializer(instance).data
+    message['is_new'] = created
     
     # Send to specific store group
     group_name = f"store_{instance.loja.id}"

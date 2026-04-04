@@ -39,12 +39,14 @@ export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor
     const [selections, setSelections] = useState<Record<number, number[]>>({});
     const [totalPrice, setTotalPrice] = useState(0);
     const [isAnimating, setIsAnimating] = useState(false);
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setQuantity(1);
             setSelections({});
             setIsAnimating(true);
+            setIsDescriptionExpanded(false);
         }
     }, [isOpen, product]);
 
@@ -154,9 +156,21 @@ export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor
                         <X size={20} />
                     </button>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-8 pointer-events-none">
-                        <div className="text-white space-y-1.5">
+                        <div className="text-white space-y-1.5 w-full">
                             <h2 className="text-2xl font-bold tracking-tight leading-tight">{product.nome}</h2>
-                            <p className="text-white/80 text-sm line-clamp-2 font-medium">{product.descricao}</p>
+                            <div className="relative">
+                                <p className={`text-white/80 text-sm font-medium transition-all duration-300 ${isDescriptionExpanded ? '' : 'line-clamp-1'}`}>
+                                    {product.descricao}
+                                </p>
+                                {product.descricao && product.descricao.length > 50 && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setIsDescriptionExpanded(!isDescriptionExpanded); }}
+                                        className="mt-1 text-[10px] font-black uppercase tracking-widest text-green-400 hover:text-green-300 flex items-center gap-1 pointer-events-auto"
+                                    >
+                                        {isDescriptionExpanded ? 'Ocultar' : '+ Ler Mais'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -224,7 +238,7 @@ export const ProductModal = ({ isOpen, onClose, product, onAddToCart, storeColor
                         </div>
                     </div>
                     {!modoCatalogo ? (
-                        <button onClick={handleConfirm} className="w-full py-5 bg-gray-900 text-white rounded-lg font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-black active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                        <button onClick={handleConfirm} className="w-full py-5 bg-green-500 text-white rounded-lg font-bold text-sm uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
                             ADICIONAR À SACOLA 
                             <ShoppingBag size={18} />
                         </button>

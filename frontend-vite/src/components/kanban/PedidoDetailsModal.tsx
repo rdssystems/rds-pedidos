@@ -1,21 +1,18 @@
-import React from 'react';
-import { X, Phone, MapPin, CreditCard, Clock, CheckCircle, ChevronRight, AlertCircle, ShoppingBag, Printer } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { Link } from 'react-router-dom';
+'use client';
 
-interface ProdutoObj {
-    nome: string;
-    preco: string;
-    descricao: string;
-}
+import React from 'react';
+import { Play, CheckCircle2, Send, X, Phone, Printer, XCircle, ChevronRight, User } from 'lucide-react';
+import { printPedido } from '@/utils/printPedido';
+import { useBilling } from '@/context/BillingContext';
 
 interface Item {
-    id: number;
+    produto_nome?: string;
+    produto_obj?: { nome: string };
+    nome?: string;
     quantidade: number;
-    produto_obj?: ProdutoObj;
     preco_unitario: string;
-    selecoes: any[];
-    observacoes: string;
+    observacoes?: string;
+    selecoes?: Array<{ grupo: string; opcao: string; preco: number }>;
 }
 
 interface Pedido {
@@ -23,351 +20,232 @@ interface Pedido {
     numero_diario: number;
     cliente_nome: string;
     cliente_whatsapp: string;
+    total: string;
+    subtotal?: string;
+    taxa?: string;
+    status: string;
     endereco: string;
     forma_pagamento: string;
     tipo: string;
-    total: string;
-    status: string;
-    criado_em: string;
-    mesa?: number;
-    observacoes?: string;
-    origem?: string;
-    external_id?: string;
     itens: Item[];
+    criado_em?: string;
 }
 
-interface PedidoDetailsModalProps {
-    pedido: Pedido | null;
+interface ModalProps {
+    pedido: Pedido;
     onClose: () => void;
-    onStatusChange: (status: string) => void;
+    onAdvance: (pedidoId: number, currentStatus: string, tipo: string) => void;
+    onCancelar: (pedidoId: number) => void;
+    storeName?: string;
 }
 
-export const PedidoDetailsModal = ({ pedido, onClose, onStatusChange }: PedidoDetailsModalProps) => {
-    const { user } = useAuth();
-    const userRoles = user?.roles?.map(r => r.role) || [];
+const STATUS_CFG: Record<string, { label: string; pill: string }> = {
+    NOVO:       { label: 'Novo',      pill: 'bg-blue-50 text-blue-600 border-blue-200' },
+    PREPARO:    { label: 'Preparo',   pill: 'bg-amber-50 text-amber-600 border-amber-200' },
+    PRONTO:     { label: 'Pronto',    pill: 'bg-teal-50 text-teal-600 border-teal-200' },
+    DESPACHADO: { label: 'Entrega',   pill: 'bg-orange-50 text-orange-600 border-orange-200' },
+    FINALIZADO: { label: 'Concluído', pill: 'bg-green-50 text-green-600 border-green-200' },
+    CANCELADO:  { label: 'Cancelado', pill: 'bg-red-50 text-red-600 border-red-200' },
+};
 
-    if (!pedido) return null;
+const canAdvance = (status: string) => ['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO'].includes(status);
 
-    const STATUS_LABELS: Record<string, string> = {
-        'NOVO': 'Novo Pedido',
-        'PREPARO': 'Em Preparo',
-        'PRONTO': 'Pronto para Entrega',
-        'DESPACHADO': 'Saiu para Entrega',
-        'FINALIZADO': 'Entregue',
-        'CANCELADO': 'Cancelado'
-    };
+const getItemName = (item: Item): string =>
+    item.produto_obj?.nome || item.produto_nome || item.nome || '—';
 
-    const STATUS_COLORS: Record<string, string> = {
-        'NOVO': 'bg-blue-100 text-blue-700',
-        'PREPARO': 'bg-yellow-100 text-yellow-700',
-        'PRONTO': 'bg-indigo-100 text-indigo-700',
-        'DESPACHADO': 'bg-orange-100 text-orange-700',
-        'FINALIZADO': 'bg-green-100 text-green-700',
-        'CANCELADO': 'bg-red-100 text-red-700'
-    };
+export const PedidoDetailsModal: React.FC<ModalProps> = ({ pedido, onClose, onAdvance, onCancelar, storeName }) => {
+    const { store } = useBilling();
+    const statusCfg = STATUS_CFG[pedido.status] || { label: pedido.status, pill: 'bg-gray-50 text-gray-500 border-gray-200' };
 
-    // Calculate time elapsed
-    const created = new Date(pedido.criado_em);
-    const now = new Date();
-    const diffMins = Math.floor((now.getTime() - created.getTime()) / 60000);
-    const timeString = diffMins > 60 ? `${Math.floor(diffMins / 60)}h ${diffMins % 60}m` : `${diffMins} min`;
-
-    const handleNextStatus = () => {
-        const flow = ['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'];
-        const currentIdx = flow.indexOf(pedido.status);
-        if (currentIdx !== -1 && currentIdx < flow.length - 1) {
-            onStatusChange(flow[currentIdx + 1]);
+    const getAdvanceLabel = () => {
+        if (store?.plano_tipo === 'START') {
+            if (pedido.status === 'NOVO') return 'Preparar';
+            return 'Finalizar';
         }
+        
+        switch (pedido.status) {
+            case 'NOVO': return 'Preparar';
+            case 'PREPARO': return 'Pronto';
+            case 'PRONTO': return pedido.tipo === 'ENTREGA' ? 'Despachar' : 'Finalizar';
+            case 'DESPACHADO': return 'Finalizar';
+            default: return 'Próxima Etapa';
+        }
+    };
+
+    const getAdvanceIcon = () => {
+        if (pedido.status === 'NOVO') return <Play size={14} />;
+        return <CheckCircle2 size={14} />;
     };
 
     const handlePrint = () => {
-        // Create a hidden iframe
-        const frame = document.createElement('iframe');
-        frame.style.display = 'none';
-        document.body.appendChild(frame);
-
-        const content = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { 
-                        font-family: 'Courier New', Courier, monospace; 
-                        width: 75mm; 
-                        margin: 0; 
-                        padding: 5mm;
-                        font-size: 12px;
-                        line-height: 1.2;
-                    }
-                    .text-center { text-center: center !important; text-align: center; }
-                    .font-bold { font-weight: bold; }
-                    .text-lg { font-size: 16px; }
-                    .text-xl { font-size: 20px; }
-                    .dashed-line { border-top: 1px dashed black; margin: 5px 0; }
-                    .double-line { border-top: 3px double black; margin: 5px 0; }
-                    table { width: 100%; border-collapse: collapse; }
-                    .item-row { border-bottom: 1px solid #eee; margin-bottom: 5px; padding: 5px 0; }
-                    .obs-box { border: 1px solid black; padding: 3px; margin-top: 5px; }
-                    @page { size: 80mm auto; margin: 0; }
-                </style>
-            </head>
-            <body>
-                <div class="text-center">
-                    <h1 class="text-lg font-bold" style="margin:0">COMANDA DE PRODUÇÃO</h1>
-                    <div class="double-line"></div>
-                    <p class="font-bold" style="margin:5px 0">PEDIDO #${pedido.numero_diario || pedido.id}</p>
-                    <p style="font-size:10px; margin:0">${new Date(pedido.criado_em).toLocaleString('pt-BR')}</p>
-                    <div class="dashed-line"></div>
-                </div>
-
-                <div style="margin-bottom: 10px">
-                    <p class="font-bold" style="margin:0">CLIENTE: ${pedido.cliente_nome.toUpperCase()}</p>
-                    <p class="font-bold" style="font-size:10px; margin:2px 0">TIPO: ${pedido.tipo.toUpperCase()}</p>
-                    ${pedido.mesa ? `<p class="font-bold text-lg text-center" style="border: 2px solid black; margin: 5px 0; padding: 5px">MESA ${pedido.mesa}</p>` : ''}
-                    <div class="dashed-line"></div>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr style="text-align: left; border-bottom: 1px solid black">
-                            <th style="padding-bottom: 5px">ITEM</th>
-                            <th style="text-align: right; padding-bottom: 5px">QTD</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${pedido.itens.map(item => `
-                            <tr style="border-bottom: 1px solid #eee">
-                                <td style="padding: 8px 0">
-                                    <p class="font-bold" style="margin:0; text-transform: uppercase">${item.produto_obj?.nome || 'PRODUTO'}</p>
-                                    ${(item.selecoes || []).map(s => `<p style="font-size:10px; margin:2px 0 0 10px">>> ${s.opcao}</p>`).join('')}
-                                    ${item.observacoes ? `
-                                        <div class="obs-box">
-                                            <p style="font-size:10px; font-weight:bold; margin:0; text-decoration: underline">OBSERVAÇÃO:</p>
-                                            <p style="font-size:11px; font-weight:900; margin:0">${item.observacoes.toUpperCase()}</p>
-                                        </div>
-                                    ` : ''}
-                                </td>
-                                <td style="text-align: right; font-weight: 900; font-size: 16px; vertical-align: top; padding-top: 8px">
-                                    ${item.quantidade}x
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-
-                <div class="dashed-line" style="margin-top: 10px"></div>
-                ${pedido.observacoes ? `
-                    <div style="margin: 10px 0; padding: 5px; border: 2px solid black">
-                        <p style="font-size: 10px; font-weight: bold; margin: 0; text-decoration: underline">OBSERVAÇÕES GERAIS:</p>
-                        <p style="font-size: 12px; font-weight: 900; margin: 5px 0 0 0">${pedido.observacoes.toUpperCase()}</p>
-                    </div>
-                    <div class="dashed-line"></div>
-                ` : ''}
-                <div class="text-center" style="font-size: 9px; margin-top: 5px">
-                    <p style="margin:0">FIM DA COMANDA</p>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(() => {
-                            window.frameElement.remove();
-                        }, 100);
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-
-        const doc = frame.contentWindow?.document || frame.contentDocument;
-        if (doc) {
-            doc.open();
-            doc.write(content);
-            doc.close();
-        }
+        printPedido(pedido, storeName);
     };
 
+    const createdAt = pedido.criado_em
+        ? new Date(pedido.criado_em).toLocaleString('pt-BR', {
+              day: '2-digit', month: '2-digit', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+          })
+        : '—';
+
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 shadow-none" onClick={onClose}>
-            <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl flex flex-col animate-slide-up overflow-hidden ring-1 ring-gray-200" onClick={e => e.stopPropagation()}>
+        <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm"
+            onClick={onClose}
+        >
+            <div 
+                className="relative w-full max-w-3xl flex flex-col bg-white rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-200 animate-in fade-in zoom-in duration-200"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Top accent by status */}
+                <div className={`h-1 w-full shrink-0 ${
+                    pedido.status === 'NOVO' ? 'bg-blue-500' :
+                    pedido.status === 'PREPARO' ? 'bg-amber-500' :
+                    pedido.status === 'PRONTO' ? 'bg-teal-500' :
+                    pedido.status === 'DESPACHADO' ? 'bg-orange-500' :
+                    pedido.status === 'FINALIZADO' ? 'bg-green-500' :
+                    'bg-red-500'
+                }`} />
 
                 {/* Header */}
-                <div className="p-4 sm:p-6 border-b flex justify-between items-start bg-gray-50/50">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                            <div className="bg-gray-900 text-white w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shadow-lg">
-                                #{pedido.numero_diario || pedido.id}
-                            </div>
-                            <span className={`text-[10px] sm:text-xs font-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-full uppercase tracking-widest shadow-sm ${STATUS_COLORS[pedido.status] || 'bg-gray-100 text-gray-500'}`}>
-                                {STATUS_LABELS[pedido.status] || pedido.status}
-                            </span>
-                            {pedido.origem === 'IFOOD' && (
-                                <span className="text-[9px] sm:text-[10px] font-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-full uppercase tracking-widest bg-red-600 text-white shadow-sm flex items-center gap-1">
-                                    <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> iFood
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-400 pl-1">
-                            Recebido há {timeString}
-                        </p>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <h2 className="font-bold text-gray-900 text-base truncate">
+                            Detalhes do Pedido #{pedido.numero_diario || pedido.id}
+                        </h2>
+                        <span className={`shrink-0 text-[10px] font-bold border rounded-full px-2.5 py-0.5 ${statusCfg.pill}`}>
+                            {statusCfg.label.toUpperCase()}
+                        </span>
                     </div>
-                    <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-full transition-colors group shrink-0">
-                        <X size={20} className="sm:w-6 sm:h-6 text-gray-400 group-hover:text-gray-600" />
+                    <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}
+                        className="ml-4 shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                        title="Fechar"
+                    >
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8 custom-scrollbar">
+                {/* Body */}
+                <div className="flex flex-col md:flex-row min-h-0 flex-1">
+                    {/* Left — cliente */}
+                    <div className="shrink-0 md:w-52 p-5 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col items-center gap-4">
+                        <p className="self-start text-[9px] font-bold text-gray-400 uppercase tracking-widest">Cliente</p>
 
-                    {/* Customer & Payment Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Customer */}
-                        <div className="space-y-2 sm:space-y-3">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <Clock size={10} className="sm:w-3 sm:h-3" /> Cliente
-                            </h3>
-                            <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                                <p className="font-bold text-base sm:text-lg text-gray-900 leading-tight truncate">{pedido.cliente_nome}</p>
-                                <a
-                                    href={`https://wa.me/${pedido.cliente_whatsapp}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-green-600 text-xs sm:text-sm font-bold hover:underline mt-2 bg-green-50 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg transition-colors"
-                                >
-                                    <Phone size={12} className="sm:w-3.5 sm:h-3.5" /> {pedido.cliente_whatsapp}
-                                </a>
-                            </div>
+                        <div className="w-14 h-14 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center">
+                            <User size={24} className="text-gray-400" />
                         </div>
 
-                        {/* Payment */}
-                        <div className="space-y-2 sm:space-y-3">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <CreditCard size={10} className="sm:w-3 sm:h-3" /> Pagamento
-                            </h3>
-                            <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col justify-center">
-                                <p className="font-black text-base sm:text-lg text-gray-800 uppercase tracking-tight">{pedido.forma_pagamento}</p>
-                                <div className="flex justify-between items-end mt-1 sm:mt-2">
-                                    <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase">Total</span>
-                                    <span className="text-lg sm:text-xl font-black text-gray-900 leading-none">R$ {pedido.total}</span>
-                                </div>
-                            </div>
+                        <div className="text-center">
+                            <p className="font-bold text-gray-900 text-sm leading-snug">{pedido.cliente_nome}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{pedido.cliente_whatsapp || '—'}</p>
+                        </div>
+
+                        <a
+                            href={`https://wa.me/55${pedido.cliente_whatsapp?.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-green-500 text-white text-xs font-bold hover:bg-green-600 transition-colors shadow-sm"
+                        >
+                            <Phone size={13} /> WhatsApp
+                        </a>
+
+                        <div className="w-full p-3 rounded-lg bg-white border border-gray-200">
+                            <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-1">
+                                {pedido.endereco ? 'Endereço' : 'Tipo'}
+                            </p>
+                            <p className="text-xs text-gray-700 leading-snug">
+                                {pedido.endereco || 'Retirada na Loja'}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Address / Type Info */}
-                    {(pedido.tipo === 'ENTREGA' || pedido.endereco) ? (
-                        <div className="space-y-2 sm:space-y-3">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <MapPin size={10} className="sm:w-3 sm:h-3" /> Endereço de Entrega
-                            </h3>
-                            <div className="bg-blue-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-blue-100 text-blue-900 font-bold relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <MapPin size={32} className="sm:w-12 sm:h-12" />
+                    {/* Right — order summary */}
+                    <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Resumo do Pedido</p>
+
+                            {/* Meta */}
+                            <div className="grid grid-cols-3 gap-3 pb-4 mb-4 border-b border-gray-100">
+                                <div>
+                                    <p className="text-[9px] text-gray-400 mb-1">Tipo</p>
+                                    <p className="text-sm font-semibold text-gray-800">{pedido.tipo}</p>
                                 </div>
-                                <p className="leading-relaxed relative z-10 text-sm sm:text-base">{pedido.endereco || 'Endereço não informado'}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-2 sm:space-y-3">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> Local do Pedido
-                            </h3>
-                            <div className="bg-purple-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-purple-100 text-purple-900 font-bold">
-                                <p className="leading-relaxed text-sm sm:text-base">Consumo Local / Balcão</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Order Observations */}
-                    {pedido.observacoes && (
-                        <div className="space-y-2 sm:space-y-3">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <AlertCircle size={10} className="sm:w-3 sm:h-3" /> Observações Gerais
-                            </h3>
-                            <div className="bg-amber-50/50 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-amber-100 text-amber-900 font-bold">
-                                <p className="leading-relaxed whitespace-pre-line text-xs sm:text-base">{pedido.observacoes}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Items */}
-                    <div className="space-y-3 sm:space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                <ShoppingBag size={10} className="sm:w-3 sm:h-3" /> Itens do Pedido
-                            </h3>
-                            <span className="text-[9px] sm:text-[10px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-500">{(pedido.itens || []).length} itens</span>
-                        </div>
-
-                        <div className="space-y-2 sm:space-y-4">
-                            {(pedido.itens || []).map((item, idx) => (
-                                <div key={idx} className="flex gap-3 sm:gap-5 p-3 sm:p-5 rounded-xl sm:rounded-[1.5rem] border border-gray-100 bg-white shadow-sm hover:border-gray-200 transition-colors">
-                                    <div className="bg-gray-50 w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl flex items-center justify-center font-black text-gray-400 border border-gray-100 text-sm sm:text-lg shadow-inner shrink-0">
-                                        {item.quantidade}x
-                                    </div>
-                                    <div className="flex-1 space-y-1 min-w-0">
-                                        <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight truncate">
-                                            {item.produto_obj?.nome || `Produto #${item.id}`}
-                                        </p>
-
-                                        {item.selecoes && item.selecoes.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1 sm:mt-2">
-                                                {item.selecoes.map((sel: any, i: number) => (
-                                                    <span key={i} className="text-[9px] sm:text-[11px] font-bold text-gray-500 bg-gray-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg border border-gray-100">
-                                                        {sel.opcao}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {item.observacoes && (
-                                            <div className="flex items-start gap-1.5 sm:gap-2 mt-1 sm:mt-2 text-amber-600 bg-amber-50 p-1.5 sm:p-2 rounded-lg text-[10px] sm:text-xs font-bold border border-amber-100">
-                                                <AlertCircle size={12} className="mt-0.5 shrink-0 sm:w-3.5 sm:h-3.5" />
-                                                <span className="leading-tight">Obs: {item.observacoes}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="font-black text-gray-900 text-sm sm:text-lg shrink-0">
-                                        R$ {item.preco_unitario}
-                                    </div>
+                                <div>
+                                    <p className="text-[9px] text-gray-400 mb-1">Pagamento</p>
+                                    <p className="text-sm font-semibold text-gray-800">{pedido.forma_pagamento}</p>
                                 </div>
-                            ))}
+                                <div>
+                                    <p className="text-[9px] text-gray-400 mb-1">Data</p>
+                                    <p className="text-sm font-semibold text-gray-800">{createdAt}</p>
+                                </div>
+                            </div>
+
+                            {/* Items */}
+                            <div className="divide-y divide-gray-100">
+                                {(pedido.itens ?? []).map((item, idx) => (
+                                    <div key={idx} className="flex items-start justify-between py-2.5 gap-4">
+                                        <div className="flex items-start gap-2.5 min-w-0">
+                                            <span className="shrink-0 text-xs font-bold text-[#007A87] w-6">{item.quantidade}x</span>
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-gray-800 font-medium leading-snug">{getItemName(item)}</p>
+                                                {item.selecoes && item.selecoes.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {item.selecoes.map((sel, sidx) => (
+                                                            <span key={sidx} className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                                                {sel.opcao}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {item.observacoes && (
+                                                    <p className="text-xs text-info-700 bg-blue-50/50 p-1 rounded mt-1 italic">
+                                                        "{item.observacoes}"
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="shrink-0 text-sm font-semibold text-gray-700">R$ {item.preco_unitario}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Total */}
+                            <div className="mt-4 pt-4 border-t border-gray-100 text-right">
+                                <p className="text-xl font-black text-gray-900">Total: R$ {pedido.total}</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Subtotal: R$ {pedido.subtotal || pedido.total}&nbsp;·&nbsp;Taxa: R$ {pedido.taxa || '0,00'}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="p-4 sm:p-6 bg-gray-50/80 backdrop-blur border-t flex flex-col-reverse sm:flex-row justify-between gap-3 sm:gap-4 shrink-0">
+                {/* Footer actions */}
+                <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
                     <button
                         onClick={handlePrint}
-                        className="px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-blue-600 text-[10px] sm:text-xs hover:bg-blue-50 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 border border-blue-100 sm:border-transparent bg-white sm:bg-transparent"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-sm font-semibold hover:bg-gray-100 transition-colors shadow-sm"
                     >
-                        <Printer size={14} className="sm:w-4 sm:h-4" /> Imprimir Comanda
+                        <Printer size={14} /> Imprimir
                     </button>
 
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 sm:flex-none">
-                        <button
-                            onClick={() => {
-                                if (window.confirm('Tem certeza que deseja cancelar este pedido?')) {
-                                    onStatusChange('CANCELADO');
-                                }
-                            }}
-                            disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                            className="px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-red-500 text-[10px] sm:text-xs hover:bg-red-50 transition-colors uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed border border-red-100 sm:border-transparent bg-white sm:bg-transparent"
-                        >
-                            Cancelar Pedido
-                        </button>
+                    <button
+                        onClick={() => onCancelar(pedido.id)}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors"
+                    >
+                        <XCircle size={14} /> Cancelar
+                    </button>
 
-                        {pedido.status !== 'FINALIZADO' && pedido.status !== 'CANCELADO' && (
-                            <button
-                                onClick={handleNextStatus}
-                                disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                                className="px-4 sm:px-8 py-3 sm:py-4 bg-gray-900 text-white rounded-xl sm:rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-xl sm:hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 group disabled:opacity-30 disabled:cursor-not-allowed w-full sm:w-auto"
-                            >
-                                <span>Avançar para {STATUS_LABELS[['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'][['NOVO', 'PREPARO', 'PRONTO', 'DESPACHADO', 'FINALIZADO'].indexOf(pedido.status) + 1]]}</span>
-                                <ChevronRight size={14} className="sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                        )}
-                    </div>
+                    {canAdvance(pedido.status) && (
+                        <button
+                            onClick={() => onAdvance(pedido.id, pedido.status, pedido.tipo)}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#007A87] text-white font-bold text-sm hover:bg-[#006673] transition-colors shadow-sm"
+                        >
+                            {getAdvanceLabel()} {getAdvanceIcon()}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

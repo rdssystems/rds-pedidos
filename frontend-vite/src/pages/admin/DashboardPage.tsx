@@ -96,7 +96,10 @@ export default function DashboardPage() {
         }
     }, [period, startDate, endDate, selectedCategory]);
 
-    const formatCurrency = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
+    const formatCurrency = (val: any) => {
+        const num = parseFloat(String(val || 0));
+        return `R$ ${isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',')}`;
+    };
 
     const statCards = [
         { label: 'Faturamento', value: formatCurrency(stats.faturamento), icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-500/10' },

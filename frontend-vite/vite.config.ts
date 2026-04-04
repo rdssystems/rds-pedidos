@@ -26,6 +26,10 @@ export default defineConfig({
         target: 'http://localhost:8001',
         changeOrigin: true,
       },
+      '/django-admin': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

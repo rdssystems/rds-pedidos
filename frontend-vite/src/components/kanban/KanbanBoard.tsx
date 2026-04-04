@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { PedidoCard } from './PedidoCard';
 import { PedidoDetailsModal } from './PedidoDetailsModal';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Printer, History as HistoryIcon, X, MessageCircle, Save, Clock, ShoppingBag, MessageSquare, AlertCircle, CheckCircle2, FileText, Loader2 } from 'lucide-react';
+import { printPedido } from '@/utils/printPedido';
 
 interface Pedido {
     id: number;
@@ -23,12 +24,14 @@ interface Pedido {
 }
 
 const COLUMNS = [
-    { id: 'NOVO', title: 'Novos', color: 'bg-blue-50' },
-    { id: 'PREPARO', title: 'Em Preparo', color: 'bg-yellow-50' },
-    { id: 'PRONTO', title: 'Prontos', color: 'bg-indigo-50' },
-    { id: 'DESPACHADO', title: 'Entrega', color: 'bg-orange-50' },
-    { id: 'FINALIZADO', title: 'Finalizados', color: 'bg-green-50' },
+    { id: 'NOVO',       title: 'NOVOS',      iconColor: 'bg-blue-500',   accent: 'border-t-blue-400' },
+    { id: 'PREPARO',    title: 'PREPARO',    iconColor: 'bg-amber-500',  accent: 'border-t-amber-400' },
+    { id: 'PRONTO',     title: 'PRONTOS',    iconColor: 'bg-teal-500',   accent: 'border-t-teal-400' },
+    { id: 'DESPACHADO', title: 'ENTREGA',    iconColor: 'bg-orange-500', accent: 'border-t-orange-400' },
+    { id: 'FINALIZADO', title: 'CONCLUÍDOS', iconColor: 'bg-green-500',  accent: 'border-t-green-400' },
 ];
+
+const HIDDEN_STATUSES = ['CANCELADO'];
 
 const DIAS_MAP: Record<number, string> = {
     0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab'
@@ -41,89 +44,69 @@ export const KanbanBoard = () => {
     const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
     const [storeConfig, setStoreConfig] = useState<any>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
-
-    // Drag & Drop State
-    const [isDragging, setIsDragging] = useState(false);
     const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+    const navigate = useNavigate();
 
-    // Date Filters
+    // CRM / Histórico State
+    const [selectedClientDetail, setSelectedClientDetail] = useState<any>(null);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
+
     const getLocalDateString = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     };
 
     const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString(new Date()));
-    const [isStoreLoaded, setIsStoreLoaded] = useState(false);
 
-    const navigate = useNavigate();
+    const getShiftStartHour = useCallback((config: any, date: Date): number => {
+        if (!config?.horario_funcionamento) return 6;
+        const diaSemana = DIAS_MAP[date.getDay()];
+        const horario = config.horario_funcionamento[diaSemana];
+        let openTimeStr = '18:00';
+        if (horario) {
+            if (typeof horario === 'string' && horario.includes('-')) openTimeStr = horario.split('-')[0].trim();
+            else if (typeof horario === 'object' && !horario.closed) openTimeStr = horario.open;
+        }
+        try {
+            const openH = parseInt(openTimeStr.split(':')[0]);
+            let shiftStart = openH - 3;
+            if (shiftStart < 0) shiftStart += 24;
+            return shiftStart;
+        } catch { return 15; }
+    }, []);
 
-    // 1. Fetch User Store Config to understand Shifts
     useEffect(() => {
         const fetchConfig = async () => {
             try {
                 const token = localStorage.getItem('token');
-                if (!token) return;
-
-                // First get user info to find store slug
-                const userRes = await fetch('/api/users/me/', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!userRes.ok) return;
+                if (!token) return null;
+                const userRes = await fetch('/api/users/me/', { headers: { Authorization: `Bearer ${token}` } });
+                if (!userRes.ok) return null;
                 const userData = await userRes.json();
-
-                // Set role - Prioritize Owner/Manager
                 const roles = userData.roles || [];
-                // Check if user has any high-level role
                 const isManagerial = roles.some((r: any) => ['owner', 'manager', 'cashier'].includes(r.role));
-
-                if (isManagerial) {
-                    // Start with 'owner' effectively for UI purposes if they have any managerial role
-                    setUserRole('owner');
-                } else if (roles.length > 0) {
-                    setUserRole(roles[0].role);
-                }
-
-                // Assuming first owned store or role store
-                // Improve this if user has multiple stores
-                let slug = null;
-                if (userData.roles && userData.roles.length > 0) {
-                    slug = userData.roles[0].store_slug;
-                }
-
+                if (isManagerial) setUserRole('owner');
+                else if (roles.length > 0) setUserRole(roles[0].role);
+                const slug = userData.roles?.[0]?.store_slug;
                 if (slug) {
-                    const storeRes = await fetch(`/api/lojas/${slug}/`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                    const storeRes = await fetch(`/api/lojas/${slug}/`, { headers: { Authorization: `Bearer ${token}` } });
                     if (storeRes.ok) {
                         const storeData = await storeRes.json();
                         setStoreConfig(storeData);
                         return storeData;
                     }
                 }
-            } catch (error) {
-                console.error("Error loading store config:", error);
-            }
+            } catch (err) { console.error('Error loading config:', err); }
             return null;
         };
-
         fetchConfig().then((config) => {
-            setIsStoreLoaded(true);
             if (config) {
-                // Calculate correct initial date based on Shift
                 const now = new Date();
-                const shiftStartHour = getShiftStartHour(config, now);
-
-                // If now < shiftStartHour (e.g. it's 14:00 and shift starts at 15:00), 
-                // we are technically in Yesterday's shift from a business perspective? 
-                // OR user wants to see "Today's" shift which hasn't started?
-                // Usually: "Show me the current active shift".
-                // If it's 02:00 AM and we close at 03:00 AM, we are in Yesterday's shift.
-                // Logic: If current hour < (OpenHour - 3h), it is previous day.
-
-                const currentHour = now.getHours();
-                if (currentHour < shiftStartHour) {
+                const shiftStart = getShiftStartHour(config, now);
+                if (now.getHours() < shiftStart) {
                     const yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
                     setSelectedDate(getLocalDateString(yesterday));
@@ -132,404 +115,456 @@ export const KanbanBoard = () => {
                 }
             }
         });
-    }, []);
-
-    const getShiftStartHour = (config: any, date: Date) => {
-        if (!config?.horario_funcionamento) return 6; // Default 6am
-
-        const diaSemana = DIAS_MAP[date.getDay()];
-        const horario = config.horario_funcionamento[diaSemana];
-
-        let openTimeStr = "18:00"; // Default fallback
-
-        if (horario) {
-            if (typeof horario === 'string' && horario.includes('-')) {
-                openTimeStr = horario.split('-')[0].trim();
-            } else if (typeof horario === 'object' && !horario.closed) {
-                openTimeStr = horario.open;
-            }
-        }
-
-        try {
-            const openH = parseInt(openTimeStr.split(':')[0]);
-            let shiftStart = openH - 3;
-            if (shiftStart < 0) shiftStart += 24;
-            return shiftStart;
-        } catch (e) {
-            return 15; // Default 15:00 (3h before 18:00)
-        }
-    };
+    }, [getShiftStartHour]);
 
     useEffect(() => {
         const fetchOrders = async () => {
             try {
                 const token = localStorage.getItem('token');
                 if (!token) return;
-
-                // Calculate Start/End ISO strings for filtering
-                // ALWAYS calculate range. Default to 6am if storeConfig not loaded yet.
-                let shiftStartHour = 6;
-                const dateObj = new Date(selectedDate + 'T12:00:00'); // Midday
-
-                if (storeConfig) {
-                    shiftStartHour = getShiftStartHour(storeConfig, dateObj);
-                }
-
+                const dateObj = new Date(selectedDate + 'T12:00:00');
+                const shiftHour = storeConfig ? getShiftStartHour(storeConfig, dateObj) : 6;
                 const start = new Date(dateObj);
-                start.setHours(shiftStartHour, 0, 0, 0);
-
+                start.setHours(shiftHour, 0, 0, 0);
                 const end = new Date(start);
-                end.setDate(end.getDate() + 1); // +24h
-
-                const startIso = start.toISOString();
-                const endIso = end.toISOString();
-
-                // Always filter by date range, but include all pending orders regardless of date
-                const url = `/api/pedidos/?start_date=${startIso}&end_date=${endIso}&include_pending=true`;
-
-                const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.status === 401) {
-                    navigate('/login');
-                    return;
-                }
-
+                end.setDate(end.getDate() + 1);
+                const url = `/api/pedidos/?start_date=${start.toISOString()}&end_date=${end.toISOString()}&include_pending=true`;
+                const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                if (response.status === 401) { navigate('/login'); return; }
                 const data = await response.json();
-
-                let results = [];
-                if (Array.isArray(data)) results = data;
-                else if (data && Array.isArray(data.results)) results = data.results;
-
-                setPedidos(results);
-
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-                setPedidos([]);
-            }
+                const results: Pedido[] = Array.isArray(data) ? data : (data?.results ?? []);
+                setPedidos(results.filter(p => !HIDDEN_STATUSES.includes(p.status)));
+            } catch (err) { console.error('Error fetching orders:', err); setPedidos([]); }
         };
-
         fetchOrders();
-    }, [navigate, selectedDate, storeConfig]);
+    }, [navigate, selectedDate, storeConfig, getShiftStartHour]);
 
     useEffect(() => {
-        // Socket updates mostly append 'today's' orders.
-        if (lastMessage) {
-            // New order received
-            if (lastMessage.is_new || lastMessage.created === true) {
-                setPedidos(prev => {
-                    const alreadyExists = prev.some(p => p.id === lastMessage.id);
-                    if (alreadyExists) return prev;
-                    return [lastMessage, ...prev];
-                });
-                playAlert();
+        if (!lastMessage) return;
+        const isNew = lastMessage.action === 'new' || lastMessage.is_new || lastMessage.created === true;
+        const orderData: Pedido = lastMessage.pedido || lastMessage;
+        if (isNew) {
+            setPedidos(prev => {
+                if (prev.some(p => p.id === orderData.id)) return prev;
+                return [orderData, ...prev];
+            });
+            playAlert();
+        } else {
+            if (orderData.status && HIDDEN_STATUSES.includes(orderData.status)) {
+                setPedidos(prev => prev.filter(p => p.id !== orderData.id));
+                if (selectedPedido?.id === orderData.id) setSelectedPedido(null);
             } else {
-                // Update received
-                setPedidos(prev => prev.map(p =>
-                    p.id === lastMessage.id ? { ...p, ...lastMessage } : p
-                ));
-                if (selectedPedido && selectedPedido.id === lastMessage.id) {
-                    setSelectedPedido(prev => ({ ...prev!, ...lastMessage }));
-                }
+                setPedidos(prev => prev.map(p => p.id === orderData.id ? { ...p, ...orderData } : p));
+                if (selectedPedido?.id === orderData.id)
+                    setSelectedPedido(prev => prev ? { ...prev, ...orderData } : prev);
             }
         }
-    }, [lastMessage]);
+    }, [lastMessage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Handlers
     const handleVerPedido = (id: number) => {
         const pedido = pedidos.find(p => p.id === id);
-        if (pedido) {
-            setSelectedPedido(pedido);
-            stopAlert();
-        }
+        if (pedido) { setSelectedPedido(pedido); stopAlert(); }
     };
 
-    // ... rest of handlers (handleStatusChange, handleAdvanceStatus) same as before ... 
-    const handleStatusChange = async (newStatus: string) => {
-        if (!selectedPedido) return;
+    const closeModal = () => setSelectedPedido(null);
+
+    const handleOpenHistory = async (whatsapp: string) => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/pedidos/${selectedPedido.id}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: newStatus })
-            });
-
-            if (response.ok) {
-                const updatedPedido = { ...selectedPedido, status: newStatus };
-                setPedidos(prev => prev.map(p => p.id === selectedPedido.id ? updatedPedido : p));
-                setSelectedPedido(null);
-            }
-        } catch (error) {
-            console.error('Error updating status:', error);
-        }
-    };
-
-    const handleAdvanceStatus = async (pedido: Pedido) => {
-        // Permission Check for Drivers
-        if (userRole === 'driver') {
-            if (pedido.status !== 'PRONTO') {
-                alert('Entregadores só podem mover pedidos de Prontos para Entrega.');
+            // Limpa o número (apenas dígitos) para garantir o filtro correto
+            const cleanedWhatsapp = whatsapp.replace(/\D/g, '');
+            if (!cleanedWhatsapp) {
+                alert('Este pedido não possui um número de WhatsApp vinculado.');
                 return;
             }
-        }
 
-        // Permission Check for Waiters
-        if (userRole === 'waiter') {
-            alert('Atendentes não podem avançar pedidos no Kanban. Pedidos em produção devem ser controlados pela cozinha.');
-            return;
-        }
-
-        let nextStatus = '';
-        if (pedido.status === 'NOVO') nextStatus = 'PREPARO';
-        else if (pedido.status === 'PREPARO') nextStatus = 'PRONTO';
-        else if (pedido.status === 'PRONTO') {
-            if (pedido.tipo !== 'ENTREGA') {
-                nextStatus = 'FINALIZADO';
-            } else {
-                nextStatus = 'DESPACHADO';
-            }
-        } else if (pedido.status === 'DESPACHADO') {
-            nextStatus = 'FINALIZADO';
-        }
-
-        if (nextStatus === 'FINALIZADO' && pedido.tipo === 'MESA') {
-            alert('Pedidos de mesa são finalizados apenas no caixa ao fechar a compra do cliente.');
-            return;
-        }
-
-        try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/pedidos/${pedido.id}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: nextStatus })
-            });
+            const tiendaId = storeConfig?.id;
+            if (!tiendaId) return;
 
-            if (response.ok) {
-                setPedidos(prev => prev.map(p =>
-                    p.id === pedido.id ? { ...p, status: nextStatus } : p
-                ));
-            }
-        } catch (error) {
-            console.error('Error advancing status:', error);
+            const res = await fetch(`/api/pedidos/get-cliente-detalhes/?loja_id=${tiendaId}&whatsapp=${cleanedWhatsapp}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Erro ao buscar histórico');
+            const data = await res.json();
+            setSelectedClientDetail(data);
+            setIsHistoryModalOpen(true);
+        } catch (err) {
+            console.error(err);
+            alert('Não foi possível carregar o histórico do cliente.');
         }
     };
 
-    // Drag & Drop Handlers
+    const handleSaveNotes = async () => {
+        if (!selectedClientDetail?.perfil) return;
+        setIsSavingNotes(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/pedidos/salvar-cliente-perfil/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    loja_id: storeConfig?.id,
+                    whatsapp: selectedClientDetail.perfil.whatsapp,
+                    observacoes: selectedClientDetail.perfil.observacoes
+                })
+            });
+            if (!res.ok) throw new Error('Erro ao salvar');
+            alert('Observações salvas com sucesso!');
+        } catch (err) {
+            console.error(err);
+            alert('Erro ao salvar observações.');
+        } finally {
+            setIsSavingNotes(false);
+        }
+    };
+
+    const patchPedidoStatus = async (pedidoId: number, newStatus: string): Promise<boolean> => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/pedidos/${pedidoId}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!response.ok) { alert(`Erro ao atualizar pedido (${response.status}).`); return false; }
+            return true;
+        } catch { alert('Erro de conexão ao atualizar pedido.'); return false; }
+    };
+
+    const handleCancelarPedido = async (pedidoId: number) => {
+        if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
+        const ok = await patchPedidoStatus(pedidoId, 'CANCELADO');
+        if (ok) {
+            setPedidos(prev => prev.filter(p => p.id !== pedidoId));
+            setSelectedPedido(null);
+        }
+    };
+
+    const handleModalAdvance = async (pedidoId: number, currentStatus: string, tipo: string) => {
+        const statusMap: Record<string, string> = {
+            NOVO: 'PREPARO',
+            PREPARO: 'PRONTO',
+            PRONTO: tipo !== 'ENTREGA' ? 'FINALIZADO' : 'DESPACHADO',
+            DESPACHADO: 'FINALIZADO',
+        };
+        const nextStatus = statusMap[currentStatus];
+        if (!nextStatus) return;
+        const ok = await patchPedidoStatus(pedidoId, nextStatus);
+        if (ok) {
+            setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: nextStatus } : p));
+            setSelectedPedido(null);
+        }
+    };
+
+    const handleCardAdvance = async (pedido: Pedido) => {
+        if (userRole === 'driver' && pedido.status !== 'PRONTO') {
+            alert('Entregadores só podem mover pedidos de Prontos para Entrega.'); return;
+        }
+        if (userRole === 'waiter') {
+            alert('Atendentes não podem avançar pedidos no Kanban.'); return;
+        }
+        const statusMap: Record<string, string> = {
+            NOVO: 'PREPARO', PREPARO: 'PRONTO',
+            PRONTO: pedido.tipo !== 'ENTREGA' ? 'FINALIZADO' : 'DESPACHADO',
+            DESPACHADO: 'FINALIZADO',
+        };
+        const nextStatus = statusMap[pedido.status];
+        if (!nextStatus) return;
+        if (nextStatus === 'FINALIZADO' && pedido.tipo === 'MESA') {
+            alert('Pedidos de mesa são finalizados apenas no caixa.'); return;
+        }
+        const previousPedidos = [...pedidos];
+        setPedidos(prev => prev.map(p => p.id === pedido.id ? { ...p, status: nextStatus } : p));
+        const ok = await patchPedidoStatus(pedido.id, nextStatus);
+        if (!ok) setPedidos(previousPedidos);
+    };
+
     const canDragAndDrop = userRole === 'owner' || userRole === 'manager' || userRole === 'cashier';
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
         if (!canDragAndDrop) return;
         e.dataTransfer.setData('text/plain', id.toString());
-        setIsDragging(true);
     };
-
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>, colId: string) => {
         e.preventDefault();
         if (!canDragAndDrop) return;
-        if (dragOverCol !== colId) {
-            setDragOverCol(colId);
-        }
+        if (dragOverCol !== colId) setDragOverCol(colId);
     };
-
-    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setDragOverCol(null);
-    };
-
+    const handleDragLeave = () => setDragOverCol(null);
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>, colId: string) => {
-        e.preventDefault();
-        setIsDragging(false);
-        setDragOverCol(null);
+        e.preventDefault(); setDragOverCol(null);
         if (!canDragAndDrop) return;
-
-        const pedidoIdStr = e.dataTransfer.getData('text/plain');
-        if (!pedidoIdStr) return;
-        const pedidoId = parseInt(pedidoIdStr);
-
+        const pedidoId = parseInt(e.dataTransfer.getData('text/plain'));
+        if (!pedidoId) return;
         const pedido = pedidos.find(p => p.id === pedidoId);
         if (!pedido || pedido.status === colId) return;
-
         if (colId === 'FINALIZADO' && pedido.tipo === 'MESA') {
-            alert('Pedidos de mesa são finalizados apenas no caixa ao fechar a compra do cliente.');
-            return;
+            alert('Pedidos de mesa são finalizados apenas no caixa.'); return;
         }
-
-        // Optimistic UI update
-        const previousPedidos = [...pedidos];
+        const previous = [...pedidos];
         setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: colId } : p));
-
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/pedidos/${pedidoId}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: colId })
-            });
-
-            if (!response.ok) {
-                // Revert on failure
-                setPedidos(previousPedidos);
-                alert('Erro ao atualizar status do pedido.');
-            }
-        } catch (error) {
-            console.error('Error dropping status:', error);
-            setPedidos(previousPedidos);
-        }
+        const ok = await patchPedidoStatus(pedidoId, colId);
+        if (!ok) setPedidos(previous);
     };
 
-    // Date Navigation Helpers
     const changeDate = (days: number) => {
         const d = new Date(selectedDate + 'T12:00:00');
         d.setDate(d.getDate() + days);
         setSelectedDate(d.toISOString().split('T')[0]);
     };
 
+    const currentModalPedido = selectedPedido
+        ? (pedidos.find(p => p.id === selectedPedido.id) ?? selectedPedido)
+        : null;
+
     return (
-        <div className="flex flex-col h-full bg-gray-100 overflow-hidden relative">
-            {/* Header / Date Filter */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
-                    <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white rounded-md shadow-sm transition-all text-gray-600 hover:text-primary">
-                        <ChevronLeft size={20} />
-                    </button>
-
-                    <div className="relative group">
-                        <div className="flex items-center gap-2 px-4 py-2 cursor-pointer">
-                            <Calendar size={18} className="text-primary" />
-                            <span className="font-bold text-gray-700 text-sm uppercase tracking-wider">
-                                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+        <div className="flex flex-col h-full overflow-hidden font-sans bg-[#F0F2F5]">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                        <button
+                            onClick={() => changeDate(-1)}
+                            className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <div className="relative px-3 py-1 bg-white rounded-md flex items-center gap-2 border border-gray-200 cursor-pointer">
+                            <Calendar size={13} className="text-[#007A87]" />
+                            <span className="font-bold text-gray-700 text-xs uppercase tracking-wider">
+                                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', {
+                                    weekday: 'short', day: '2-digit', month: 'short'
+                                })}
                             </span>
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={e => setSelectedDate(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
                         </div>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
+                        <button
+                            onClick={() => changeDate(1)}
+                            className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
                     </div>
-
-                    <button onClick={() => changeDate(1)} className="p-2 hover:bg-white rounded-md shadow-sm transition-all text-gray-600 hover:text-primary">
-                        <ChevronRight size={20} />
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                        className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+                        onClick={() => setSelectedDate(getLocalDateString(new Date()))}
+                        className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[#007A87] border border-[#007A87]/30 hover:bg-[#007A87]/5 rounded-lg transition-colors"
                     >
                         Hoje
                     </button>
-                    <div className="h-4 w-px bg-gray-300 mx-2"></div>
-                    <span className="text-xs font-medium text-gray-400">
-                        {pedidos.length} pedidos
-                    </span>
+                </div>
+
+                <div className="text-right">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Total do Dia</p>
+                    <p className="text-sm font-black text-gray-800 leading-none">{pedidos.length} pedidos</p>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col">
-                {/* Desktop Kanban View */}
-                <div className="hidden md:flex flex-1 overflow-x-auto p-6">
-                    <div className="flex gap-6 h-full min-w-max lg:min-w-0 lg:w-full">
-                        {COLUMNS
-                            .filter(col => {
-                                if (userRole === 'driver') {
-                                    return col.id === 'PRONTO' || col.id === 'DESPACHADO';
-                                }
-                                return true;
-                            })
-                            .map(column => (
-                                <div
-                                    key={column.id}
-                                    onDragOver={(e) => handleDragOver(e, column.id)}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={(e) => handleDrop(e, column.id)}
-                                    className={`w-80 lg:w-full lg:flex-1 rounded-xl flex flex-col transition-all duration-300 ${dragOverCol === column.id ? 'ring-4 ring-primary ring-opacity-50 scale-[1.02]' : ''} ${column.color} shadow-sm border border-white/50`}
-                                >
-                                    <div className="p-6 flex justify-between items-center border-b border-gray-200/50">
-                                        <h2 className="font-black text-gray-700 uppercase tracking-widest text-xs flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${column.id === 'NOVO' ? 'bg-blue-500' :
-                                                column.id === 'PREPARO' ? 'bg-yellow-500' :
-                                                    column.id === 'PRONTO' ? 'bg-indigo-500' :
-                                                        column.id === 'DESPACHADO' ? 'bg-orange-500' :
-                                                            'bg-green-500'
-                                                }`}></div>
+            {/* Board */}
+            <div className="flex-1 overflow-x-auto p-5 flex gap-4">
+                {COLUMNS
+                    .filter(col => userRole !== 'driver' || col.id === 'PRONTO' || col.id === 'DESPACHADO')
+                    .map(column => {
+                        const colPedidos = pedidos.filter(p => p.status === column.id);
+                        return (
+                            <div
+                                key={column.id}
+                                onDragOver={e => handleDragOver(e, column.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={e => handleDrop(e, column.id)}
+                                className={`min-w-[270px] flex-1 rounded-xl flex flex-col border-t-2 transition-all duration-200 ${column.accent} ${
+                                    dragOverCol === column.id
+                                        ? 'ring-2 ring-[#007A87]/40 shadow-lg'
+                                        : 'shadow-sm'
+                                }`}
+                                style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderTopWidth: '2px' }}
+                            >
+                                {/* Column header */}
+                                <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${column.iconColor}`} />
+                                        <h2 className="font-bold text-gray-600 uppercase tracking-[0.15em] text-[10px]">
                                             {column.title}
                                         </h2>
-                                        <span className="bg-white/80 px-3 py-1 rounded-xl text-xs font-black text-gray-400 shadow-sm backdrop-blur-sm">
-                                            {pedidos.filter(p => p.status === column.id).length}
-                                        </span>
                                     </div>
-
-                                    <div className={`flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4 transition-all duration-300 ${isDragging && dragOverCol === column.id ? 'bg-white/40' : ''}`}>
-                                        {pedidos
-                                            .filter(p => p.status === column.id)
-                                            .map(pedido => (
-                                                <PedidoCard
-                                                    key={pedido.id}
-                                                    pedido={pedido}
-                                                    onVerPedido={handleVerPedido}
-                                                    onAvançar={() => handleAdvanceStatus(pedido)}
-                                                    draggable={canDragAndDrop}
-                                                    onDragStart={handleDragStart}
-                                                />
-                                            ))
-                                        }
-                                        {pedidos.filter(p => p.status === column.id).length === 0 && (
-                                            <div className="h-full min-h-[100px] flex flex-col items-center justify-center opacity-30 space-y-2 pointer-events-none">
-                                                <div className="w-12 h-12 bg-gray-900/5 rounded-full"></div>
-                                                <p className="text-xs font-black uppercase tracking-widest text-gray-900">Vazio</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                                        {colPedidos.length}
+                                    </span>
                                 </div>
-                            ))}
-                    </div>
-                </div>
 
-                {/* Mobile Vertical List View */}
-                <div className="md:hidden flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
-                    {pedidos
-                        .filter(p => p.status !== 'FINALIZADO') // Filter out finished orders initially to not clutter
-                        .sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())
-                        .map(pedido => (
-                            <PedidoCard
-                                key={pedido.id}
-                                pedido={pedido}
-                                onVerPedido={handleVerPedido}
-                                onAvançar={() => handleAdvanceStatus(pedido)}
-                                draggable={false}
-                            />
-                        ))}
-                    {pedidos.filter(p => p.status !== 'FINALIZADO').length === 0 && (
-                        <div className="h-full min-h-[200px] flex flex-col items-center justify-center opacity-50 space-y-4 pointer-events-none">
-                            <div className="w-16 h-16 bg-gray-900/5 rounded-full"></div>
-                            <p className="text-sm font-black uppercase tracking-widest text-gray-900">Nenhum Pedido Ativo</p>
-                        </div>
-                    )}
-                </div>
+                                {/* Cards */}
+                                <div className="flex-1 overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
+                                    {colPedidos.map(pedido => (
+                                        <PedidoCard
+                                            key={pedido.id}
+                                            pedido={pedido}
+                                            onVerPedido={handleVerPedido}
+                                            onVerHistorico={handleOpenHistory}
+                                            onImprimir={() => printPedido(pedido, storeConfig?.nome)}
+                                            onAvançar={() => handleCardAdvance(pedido)}
+                                            draggable={canDragAndDrop}
+                                            onDragStart={handleDragStart}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
             </div>
 
-            {selectedPedido && (
+            {currentModalPedido && (
                 <PedidoDetailsModal
-                    pedido={selectedPedido}
-                    onClose={() => setSelectedPedido(null)}
-                    onStatusChange={handleStatusChange}
+                    pedido={currentModalPedido}
+                    onClose={closeModal}
+                    onAdvance={handleModalAdvance}
+                    onCancelar={handleCancelarPedido}
+                    storeName={storeConfig?.nome}
                 />
+            )}
+
+            {/* Modal de Histórico do Cliente */}
+            {isHistoryModalOpen && selectedClientDetail && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-5xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 max-h-[90vh]">
+                        {/* Header do Modal */}
+                        <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-white shrink-0">
+                            <div className="flex items-center gap-6">
+                                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-primary border border-gray-100">
+                                    <MessageSquare size={32} />
+                                </div>
+                                <div>
+                                    <h2 className="text-3xl font-black text-gray-900 italic tracking-tight uppercase">
+                                        {selectedClientDetail.perfil?.nome || 'Cliente'}
+                                    </h2>
+                                    <div className="flex items-center gap-2 text-gray-400 mt-1">
+                                        <MessageCircle size={14} />
+                                        <span className="text-[11px] font-black tracking-widest">{selectedClientDetail.perfil?.whatsapp}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setIsHistoryModalOpen(false)}
+                                className="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-all"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Conteúdo do Modal */}
+                        <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 custom-scrollbar">
+                            
+                            {/* Coluna Esquerda: Notas e Resumo */}
+                            <div className="space-y-8 h-full flex flex-col">
+                                <div className="space-y-4 flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <FileText className="text-primary" size={20} />
+                                        <h3 className="font-black text-gray-900 text-[11px] uppercase tracking-widest">Observações Permanentes</h3>
+                                    </div>
+                                    <div className="relative group flex-1 min-h-[200px] flex flex-col">
+                                        <textarea
+                                            value={selectedClientDetail.perfil?.observacoes || ''}
+                                            onChange={(e) => setSelectedClientDetail({
+                                                ...selectedClientDetail, 
+                                                perfil: { ...selectedClientDetail.perfil, observacoes: e.target.value }
+                                            })}
+                                            placeholder="Ex: Cliente alérgico a glúten, prefere entrega rápida..."
+                                            className="w-full flex-1 p-6 bg-gray-50 rounded-3xl border-2 border-transparent focus:border-primary/20 focus:bg-white transition-all outline-none text-gray-700 font-medium text-sm resize-none"
+                                        />
+                                        <button 
+                                            onClick={handleSaveNotes}
+                                            disabled={isSavingNotes}
+                                            className="absolute bottom-4 right-4 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isSavingNotes ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                                            {isSavingNotes ? 'Salvando...' : 'Salvar Anotações'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-blue-50/50 p-6 rounded-[32px] border border-blue-100/50">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <AlertCircle className="text-blue-500" size={16} />
+                                        <h4 className="font-black text-blue-900 text-[9px] uppercase tracking-widest">Resumo Financeiro</h4>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                                            <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Total de Pedidos</p>
+                                            <p className="text-xl font-black text-blue-900 italic">{selectedClientDetail.historico?.length || 0}</p>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                                            <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Valor Total Gasto</p>
+                                            <p className="text-xl font-black text-blue-900 italic">R$ {Number(selectedClientDetail.historico?.reduce((sum: number, p: any) => sum + Number(p.total), 0) || 0).toFixed(2).replace('.', ',')}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Coluna Direita: Histórico de Pedidos com Scroll Independente */}
+                            <div className="flex flex-col h-full overflow-hidden min-h-0 border-l border-gray-50 pl-8">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Clock className="text-primary" size={20} />
+                                    <h3 className="font-black text-gray-900 text-[11px] uppercase tracking-widest">Histórico de Atividade</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar" style={{maxHeight: 'calc(90vh - 200px)'}}>
+                                    {selectedClientDetail.historico.length === 0 ? (
+                                        <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">
+                                            <ShoppingBag className="mx-auto text-gray-200 mb-4" size={48} />
+                                            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Nenhum pedido encontrado</p>
+                                        </div>
+                                    ) : (
+                                        selectedClientDetail.historico.map((pedido: any) => (
+                                            <div key={pedido.id} className="bg-white border border-gray-100 rounded-3xl hover:border-primary/20 transition-all group overflow-hidden shadow-sm hover:shadow-md">
+                                                <div 
+                                                    className="p-5 flex items-center justify-between cursor-pointer"
+                                                    onClick={() => {
+                                                        const el = document.getElementById(`items-k-${pedido.id}`);
+                                                        if (el) el.classList.toggle('hidden');
+                                                    }}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-3 bg-gray-50 rounded-2xl group-hover:bg-primary/5 transition-colors text-gray-400 group-hover:text-primary">
+                                                            <ShoppingBag size={18} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-[11px] font-black text-gray-900 uppercase">Pedido #{pedido.id}</p>
+                                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${
+                                                                    pedido.status === 'FINALIZADO' ? 'bg-green-100 text-green-600' : 
+                                                                    pedido.status === 'CANCELADO' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+                                                                }`}>
+                                                                    {pedido.status}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold text-gray-400 mt-0.5">
+                                                                {new Date(pedido.criado_em).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="font-black text-gray-900 text-base italic">R$ {Number(pedido.total).toFixed(2).replace('.', ',')}</p>
+                                                </div>
+
+                                                <div id={`items-k-${pedido.id}`} className="hidden bg-gray-50/50 border-t border-gray-50 p-6 flex flex-wrap gap-2">
+                                                    {pedido.itens?.map((it: any, idx: number) => (
+                                                        <span key={idx} className="text-[10px] font-bold text-gray-600 bg-white border border-gray-100 px-2.5 py-1 rounded-xl shadow-sm">
+                                                            {it.quantidade}x {it.produto_nome}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

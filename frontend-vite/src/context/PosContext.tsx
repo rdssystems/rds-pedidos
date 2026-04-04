@@ -35,8 +35,10 @@ interface PosContextType {
     addToCart: (product: any, selecoes?: any[], observacoes?: string) => void;
     removeFromCart: (uuid: string) => void;
     clearCart: () => void;
+    activeMesaOrders: number[];
     checkout: (paymentMethod: string, amountPaid: number, cliente?: any, orderObs?: string) => Promise<any>;
     loadTableOrders: (mesaNum: number) => Promise<void>;
+    loadOrderById: (orderId: number) => Promise<any>;
     sendToKitchen: (clientInfo?: any, orderObs?: string) => Promise<any>;
     registrarSangria: (valor: number, descricao: string) => Promise<void>;
     registrarSuprimento: (valor: number, descricao: string) => Promise<void>;
@@ -47,7 +49,7 @@ const PosContext = createContext<PosContextType>({} as PosContextType);
 export const PosProvider = ({ children }: { children: React.ReactNode }) => {
     const [caixa, setCaixa] = useState<Caixa | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const { refreshBilling } = useBilling();
+    const { refreshBilling, store } = useBilling();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [products, setProducts] = useState<any[]>([]);
     const [activeMesaOrders, setActiveMesaOrders] = useState<number[]>([]);
@@ -262,12 +264,14 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
     const checkout = async (paymentMethod: string, amountPaid: number, cliente: any = null, orderObs: string = '') => {
         if (!caixa) throw new Error("Caixa fechado");
         const token = localStorage.getItem('token');
+        const ordersToFinalize = [...activeMesaOrders];
 
         const payload = {
             caixa: caixa.id,
             forma_pagamento: paymentMethod,
-            valor: total,
-            total_pago: amountPaid,
+            total: total,
+            valor_pago: amountPaid,
+            troco: Math.max(0, amountPaid - total),
             mesa_orders: activeMesaOrders,
             mesa: activeMesaNum,
             tipo: activeMesaNum ? 'MESA' : 'BALCAO',
@@ -298,6 +302,25 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const data = await res.json();
+
+        // Para o plano START, se houver pedidos vinculados (do botão Produção), finaliza o status deles
+        if (store?.plano_tipo === 'START' && ordersToFinalize.length > 0) {
+            for (const pedidoId of ordersToFinalize) {
+                try {
+                    await fetch(`/api/pedidos/${pedidoId}/`, {
+                        method: 'PATCH',
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ status: 'FINALIZADO' }),
+                    });
+                } catch (e) {
+                    console.error("Erro ao finalizar status do pedido:", pedidoId, e);
+                }
+            }
+        }
+
         setActiveMesaOrders([]);
         setActiveMesaNum(null);
         clearCart();
@@ -328,7 +351,9 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
                         nome: item.produto_obj?.nome || 'Produto',
                         precoUnitario: parseFloat(item.preco_unitario),
                         quantidade: item.quantidade,
-                        total: parseFloat(item.preco_unitario) * item.quantidade
+                        total: parseFloat(item.preco_unitario) * item.quantidade,
+                        selecoes: item.selecoes || [],
+                        observacoes: item.observacoes || ''
                     });
                 });
             });
@@ -336,6 +361,37 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
             setCart(tableItems);
             setActiveMesaOrders(results.map((o: any) => o.id));
         }
+    };
+
+    const loadOrderById = async (orderId: number) => {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/pedidos/${orderId}/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+            const order = await res.json();
+            const tableItems: CartItem[] = [];
+            
+            order.itens.forEach((item: any) => {
+                tableItems.push({
+                    produtoId: item.produto,
+                    uuid: crypto.randomUUID(),
+                    nome: item.produto_obj?.nome || 'Produto',
+                    precoUnitario: parseFloat(item.preco_unitario),
+                    quantidade: item.quantidade,
+                    total: parseFloat(item.preco_unitario) * item.quantidade,
+                    selecoes: item.selecoes || [],
+                    observacoes: item.observacoes || ''
+                });
+            });
+
+            setCart(tableItems);
+            setActiveMesaOrders([order.id]);
+            setActiveMesaNum(order.mesa);
+            return order;
+        }
+        return null;
     };
 
     const sendToKitchen = async (clientInfo: any = null, orderObs: string = '') => {
@@ -410,8 +466,8 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
         <PosContext.Provider value={{
             caixa, isLoading, cart, total, products,
             abrirCaixa, fecharCaixa, refreshCaixa: fetchCaixa, refreshProducts: fetchProducts,
-            addToCart, removeFromCart, clearCart, checkout, loadTableOrders, sendToKitchen,
-            registrarSangria, registrarSuprimento
+            addToCart, removeFromCart, clearCart, checkout, loadTableOrders, loadOrderById, sendToKitchen,
+            registrarSangria, registrarSuprimento, activeMesaOrders
         }}>
             {children}
         </PosContext.Provider>

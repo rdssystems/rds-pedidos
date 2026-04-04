@@ -151,8 +151,9 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     const menuItems = [
         { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['owner', 'manager'] },
         { label: 'Mesas', icon: LayoutGrid, href: '/mesas', roles: ['owner', 'manager', 'waiter'], plan: ['PRO', 'ELITE'] },
-        { label: 'Pedidos', icon: ShoppingBag, href: '/orders', roles: ['owner', 'manager', 'waiter', 'kitchen', 'driver', 'cashier'], plan: ['PRO', 'ELITE'] },
+        { label: 'Pedidos', icon: ShoppingBag, href: '/orders', roles: ['owner', 'manager', 'waiter', 'kitchen', 'driver', 'cashier'], plan: ['START', 'PRO', 'ELITE'] },
         { label: 'Caixa', icon: CreditCard, href: '/pos', roles: ['owner', 'manager', 'cashier'], plan: ['START', 'PRO', 'ELITE'] },
+        { label: 'CRM Clientes', icon: Users, href: '/crm', roles: ['owner', 'manager'], plan: ['START', 'PRO', 'ELITE'] },
         { label: 'Cardápio', icon: UtensilsCrossed, href: '/menu', roles: ['owner', 'manager'] },
         { label: 'Equipe', icon: Users, href: '/settings/team', roles: ['owner', 'manager'], plan: ['PRO', 'ELITE'] },
         { label: 'Integrações', icon: MessageSquare, href: '/integrations', roles: ['owner', 'manager'], plan: ['PRO', 'ELITE'] },
@@ -229,7 +230,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                             <img src="/logo-perfil.png" alt="Padrão" className="w-full h-full object-cover opacity-80" />
                         )}
                     </div>
-                    <h1 className="text-base font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight line-clamp-2 max-w-[200px]">{store?.nome || 'Admin'}</h1>
+                    <h1 className="text-base font-black text-[#0f172a] italic tracking-tighter uppercase leading-tight line-clamp-2 max-w-[200px]">{store?.nome || user?.first_name || '...'}</h1>
                 </div>
                 <button
                     onClick={logout}
@@ -277,7 +278,7 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                             {!isMinimized && (
                                 <div className="flex flex-col min-w-0">
                                     <h1 className="text-sm font-bold text-[#333333] tracking-tighter uppercase leading-tight truncate">
-                                        {store?.nome || 'Admin'}
+                                        {store?.nome || user?.first_name || 'Carregando...'}
                                     </h1>
                                     <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase mt-0.5">Gestão SaaS</span>
                                 </div>

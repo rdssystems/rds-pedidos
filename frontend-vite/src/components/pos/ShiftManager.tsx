@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePos } from '../../context/PosContext';
 import { useAuth } from '../../context/AuthContext';
-import { Lock, Unlock, AlertTriangle, ChevronLeft, X, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Lock, Unlock, AlertTriangle, ChevronLeft, X, ArrowDownCircle, ArrowUpCircle, Loader2 } from 'lucide-react';
 
 export const ShiftManager = () => {
     const { user } = useAuth();
@@ -86,45 +86,55 @@ export const ShiftManager = () => {
 
     if (!caixa) {
         return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-up relative">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] p-10 max-w-sm w-full animate-slide-up relative border border-gray-100">
                     <button
                         onClick={handleBack}
-                        className="absolute top-4 left-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                        className="absolute top-6 left-6 p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-all"
                         type="button"
                     >
-                        <ChevronLeft size={24} />
+                        <ChevronLeft size={20} />
                     </button>
 
-                    <div className="text-center mb-6">
-                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                            <Lock size={32} />
+                    <div className="text-center mb-10">
+                        <div className="w-20 h-20 bg-red-50 rounded-[28px] flex items-center justify-center mx-auto mb-6 text-red-500 shadow-inner">
+                            <Lock size={32} strokeWidth={2.5} />
                         </div>
-                        <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Caixa Fechado</h2>
-                        <p className="text-gray-500 mt-2">Informe o fundo de troco para iniciar as vendas.</p>
+                        <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Caixa Fechado</h2>
+                        <p className="text-gray-400 mt-2 text-sm font-medium">Informe o fundo de troco para iniciar as vendas.</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Saldo Inicial (R$)</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={amount}
-                                onChange={e => setAmount(e.target.value)}
-                                className="w-full text-3xl font-black text-center border-b-2 border-gray-200 focus:border-primary outline-none py-2 bg-transparent"
-                                placeholder="0,00"
-                                autoFocus
-                            />
+                    <form onSubmit={handleSubmit} className="space-y-8">
+                        <div className="relative">
+                            <label className="block text-[10px] font-black uppercase text-gray-400 mb-3 tracking-[0.2em] ml-1">Saldo Inicial (R$)</label>
+                            <div className="relative group">
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={amount}
+                                    onChange={e => setAmount(e.target.value)}
+                                    className="w-full text-4xl font-black text-center text-gray-800 border-b-4 border-gray-100 focus:border-primary outline-none py-4 bg-transparent transition-all placeholder:text-gray-200"
+                                    placeholder="0,00"
+                                    autoFocus
+                                />
+                            </div>
                         </div>
 
-                        {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 p-2 rounded">{error}</div>}
+                        {error && (
+                            <div className="text-red-500 text-[11px] font-black text-center bg-red-50 p-4 rounded-2xl border border-red-100 animate-shake">
+                                {error}
+                            </div>
+                        )}
 
                         <button
                             disabled={isSubmitting || !amount}
-                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-widest rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-5 bg-primary text-white font-black uppercase tracking-[0.2em] rounded-[24px] shadow-2xl shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center justify-center disabled:opacity-50 disabled:grayscale"
                         >
-                            {isSubmitting ? 'Abrindo...' : 'ABRIR CAIXA'}
+                            {isSubmitting ? (
+                                <Loader2 className="animate-spin" size={24} />
+                            ) : (
+                                "ABRIR CAIXA"
+                            )}
                         </button>
                     </form>
                 </div>

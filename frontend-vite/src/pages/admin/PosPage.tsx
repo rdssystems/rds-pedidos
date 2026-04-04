@@ -5,6 +5,7 @@ import { PosProvider, usePos } from '../../context/PosContext';
 import { useBilling } from '../../context/BillingContext';
 import { ShiftManager } from '../../components/pos/ShiftManager';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, Users, Loader2, ChefHat, UserPlus, X, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { PedidoDetailsModal } from '../../components/kanban/PedidoDetailsModal';
 
 const ProductAttributesModal = ({ product, onClose, onAdd }: { product: any, onClose: () => void, onAdd: (selections: any[], obs: string) => void }) => {
     const [selections, setSelections] = useState<any[]>([]);
@@ -117,7 +118,7 @@ const ProductAttributesModal = ({ product, onClose, onAdd }: { product: any, onC
 };
 
 const PosContent = () => {
-    const { caixa, cart, addToCart, removeFromCart, clearCart, total, checkout, products, loadTableOrders, sendToKitchen } = usePos();
+const { caixa, cart, addToCart, removeFromCart, clearCart, total, checkout, products, loadTableOrders, loadOrderById, sendToKitchen, activeMesaOrders } = usePos();
     const { store } = useBilling();
     const [searchTerm, setSearchTerm] = useState('');
     const [clienteNome, setClienteNome] = useState('');
@@ -133,6 +134,7 @@ const PosContent = () => {
     const [mesas, setMesas] = useState<any[]>([]);
     const [loadingMesas, setLoadingMesas] = useState(false);
     const [isCartMobileOpen, setIsCartMobileOpen] = useState(false);
+    const [lastCreatedOrder, setLastCreatedOrder] = useState<any>(null);
     
     const getImageUrl = (url: string) => {
         if (!url) return '';
@@ -147,15 +149,35 @@ const PosContent = () => {
         try {
             const token = localStorage.getItem('token');
             const storeId = localStorage.getItem('activeStoreId');
-            const res = await fetch(`/api/pedidos/mesas/?loja_id=${storeId}`, {
+            
+            // No plano START, mostramos estritamente o que está na coluna PRONTOS
+            const endpoint = store?.plano_tipo === 'START'
+                ? `/api/pedidos/?loja_id=${storeId}&status=PRONTO`
+                : `/api/pedidos/mesas/?loja_id=${storeId}`;
+
+            const res = await fetch(endpoint, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (res.ok) setMesas(await res.json());
+            
+            if (res.ok) {
+                const data = await res.json();
+                setMesas(data.results || data);
+            }
         } catch (err) {
             console.error(err);
         } finally {
             setLoadingMesas(false);
         }
+    };
+
+    const handleImportOrder = async (orderId: number) => {
+        const orderData = await loadOrderById(orderId);
+        if (orderData) {
+            setClienteNome(orderData.cliente_nome || '');
+            setClienteWhatsapp(orderData.cliente_whatsapp || '');
+            setOrderObservation(orderData.observacoes || '');
+        }
+        setIsTableModalOpen(false);
     };
 
     const handleImportTable = async (num: number) => {
@@ -175,6 +197,8 @@ const PosContent = () => {
             setClienteNome('');
             setClienteWhatsapp('');
             setOrderObservation('');
+            // Se for plano START, atualiza a produção imediatamente para limpar o que foi pago
+            if (store?.plano_tipo === 'START') fetchMesas();
             alert('Venda realizada com sucesso!');
         } catch (err: any) {
             alert(err.message);
@@ -183,11 +207,11 @@ const PosContent = () => {
 
     const handleSendToKitchen = async () => {
         try {
-            await sendToKitchen({ nome: clienteNome, whatsapp: clienteWhatsapp }, orderObservation);
+            const order = await sendToKitchen({ nome: clienteNome, whatsapp: clienteWhatsapp }, orderObservation);
             setClienteNome('');
             setClienteWhatsapp('');
             setOrderObservation('');
-            alert('Pedido realizado com sucesso!');
+            setLastCreatedOrder(order);
         } catch (err: any) {
             alert(err.message);
         }
@@ -237,13 +261,24 @@ const PosContent = () => {
                     <div className="flex items-center justify-between w-full lg:w-auto gap-2 lg:gap-4 shrink-0">
                         <div className="flex items-center gap-2 lg:gap-3 shrink-0">
                             <h1 className="font-black text-xl text-gray-900 xl:block uppercase tracking-tighter italic shrink-0">Caixa</h1>
-                            <button
-                                onClick={() => { setIsTableModalOpen(true); fetchMesas(); }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 lg:px-4 lg:py-2 rounded-xl font-bold text-xs lg:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
-                            >
-                                <Users size={16} />
-                                <span className="hidden sm:inline">MESAS</span>
-                            </button>
+                            
+                            {store?.plano_tipo === 'START' ? (
+                                <button
+                                    onClick={() => { setIsTableModalOpen(true); fetchMesas(); }}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 lg:px-4 lg:py-2 rounded-xl font-bold text-xs lg:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-orange-500/20 shrink-0"
+                                >
+                                    <ChefHat size={16} />
+                                    <span className="hidden sm:inline">PRODUÇÃO</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => { setIsTableModalOpen(true); fetchMesas(); }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 lg:px-4 lg:py-2 rounded-xl font-bold text-xs lg:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
+                                >
+                                    <Users size={16} />
+                                    <span className="hidden sm:inline">MESAS</span>
+                                </button>
+                            )}
                         </div>
                         <div className="flex-1 lg:flex-none flex justify-end">
                             <ShiftManager />
@@ -377,10 +412,16 @@ const PosContent = () => {
                         <span className="text-2xl font-black text-gray-800 leading-none">R$ {total.toFixed(2)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <button onClick={handleSendToKitchen} disabled={cart.length === 0} className="py-3 bg-blue-500 text-white font-bold text-sm uppercase rounded-xl flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50">
-                            <ChefHat size={18} /> Cozinha
-                        </button>
-                        <button onClick={() => setIsCheckoutModalOpen(true)} disabled={cart.length === 0} className="py-3 bg-green-500 text-white font-black text-sm uppercase rounded-xl flex flex-col items-center justify-center gap-1 shadow-lg shadow-green-500/20 active:scale-95 disabled:opacity-50">
+                        {(!activeMesaOrders || activeMesaOrders.length === 0) && (
+                            <button onClick={handleSendToKitchen} disabled={cart.length === 0} className="py-3 bg-blue-500 text-white font-bold text-sm uppercase rounded-xl flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50">
+                                <ChefHat size={18} /> Cozinha
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => setIsCheckoutModalOpen(true)} 
+                            disabled={cart.length === 0} 
+                            className={`py-3 bg-green-500 text-white font-black text-sm uppercase rounded-xl flex flex-col items-center justify-center gap-1 shadow-lg shadow-green-500/20 active:scale-95 disabled:opacity-50 ${activeMesaOrders?.length > 0 ? 'col-span-2' : ''}`}
+                        >
                             <ShoppingCart size={18} /> Finalizar
                         </button>
                     </div>
@@ -392,21 +433,113 @@ const PosContent = () => {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden p-8 space-y-6">
                         <h2 className="text-xl font-black text-gray-800 uppercase text-center border-b pb-4">Pagamento</h2>
-                        <div className="text-center bg-gray-50 py-6 rounded-xl border border-gray-100">
+                        <div className="text-center bg-gray-50 py-4 rounded-xl border border-gray-100">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total a Pagar</span>
-                            <p className="text-4xl font-black text-gray-900 mt-1">R$ {total.toFixed(2)}</p>
+                            <p className="text-3xl font-black text-gray-900 mt-1">R$ {total.toFixed(2)}</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+
+                        <div className="grid grid-cols-4 gap-2">
                             {['DINHEIRO', 'DEBITO', 'CREDITO', 'PIX'].map(method => (
-                                <button key={method} onClick={() => setPaymentMethod(method)} className={`p-4 rounded-xl border-2 font-black uppercase text-[10px] tracking-widest transition-all ${paymentMethod === method ? 'border-primary bg-primary/5 text-primary ring-4 ring-primary/10' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>{method}</button>
+                                <button 
+                                    key={method} 
+                                    onClick={() => setPaymentMethod(method)} 
+                                    className={`p-3 rounded-xl border-2 font-black uppercase text-[9px] tracking-widest transition-all ${paymentMethod === method ? 'border-primary bg-primary/5 text-primary ring-4 ring-primary/10' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                >
+                                    {method === 'DINHEIRO' && <Banknote size={14} className="mx-auto mb-1" />}
+                                    {method === 'DEBITO' && <CreditCard size={14} className="mx-auto mb-1" />}
+                                    {method === 'CREDITO' && <CreditCard size={14} className="mx-auto mb-1" />}
+                                    {method === 'PIX' && <QrCode size={14} className="mx-auto mb-1" />}
+                                    {method}
+                                </button>
                             ))}
                         </div>
-                        <div className="pt-4 space-y-3">
+
+                        {paymentMethod === 'DINHEIRO' && (
+                            <div className="space-y-4 animate-slide-up">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor Recebido</label>
+                                    <div className="relative">
+                                        <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <input
+                                            type="number"
+                                            value={amountPaid}
+                                            onChange={e => setAmountPaid(e.target.value)}
+                                            placeholder="Ex: 100.00"
+                                            className="w-full pl-12 pr-4 py-4 rounded-xl border-2 border-gray-100 focus:border-primary focus:outline-none font-black text-xl text-primary bg-gray-50/30"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl border border-green-100">
+                                    <span className="text-xs font-black text-green-600 uppercase tracking-widest">Troco</span>
+                                    <span className="text-2xl font-black text-green-600 tracking-tighter italic">R$ {change.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="pt-2 space-y-3">
                             <button onClick={handleCheckout} className="w-full py-5 bg-green-500 text-white font-black text-lg uppercase tracking-widest rounded-xl shadow-xl hover:bg-green-600 active:scale-95 transition-all">FINALIZAR VENDA</button>
-                            <button onClick={() => setIsCheckoutModalOpen(false)} className="w-full py-2 text-gray-400 font-bold uppercase text-[10px] tracking-widest hover:text-gray-600 transition-colors">CANCELAR</button>
+                            <button onClick={() => { setIsCheckoutModalOpen(false); setAmountPaid(''); }} className="w-full py-2 text-gray-400 font-bold uppercase text-[10px] tracking-widest hover:text-gray-600 transition-colors">CANCELAR</button>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Identificar Cliente Modal */}
+            {isClientModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden p-8 space-y-6 animate-slide-up">
+                        <div className="flex justify-between items-center border-b pb-4">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 uppercase italic tracking-tight">Identificar Cliente</h2>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vincule um cliente à venda</p>
+                            </div>
+                            <button onClick={() => setIsClientModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                <X size={20} className="text-gray-400" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome do Cliente</label>
+                                <input
+                                    type="text"
+                                    value={clienteNome}
+                                    onChange={e => setClienteNome(e.target.value)}
+                                    placeholder="Ex: João Silva"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-100 focus:border-primary focus:outline-none bg-gray-50/50 font-bold"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">WhatsApp (Opcional)</label>
+                                <input
+                                    type="text"
+                                    value={clienteWhatsapp}
+                                    onChange={e => setClienteWhatsapp(e.target.value)}
+                                    placeholder="Ex: 5511999999999"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-100 focus:border-primary focus:outline-none bg-gray-50/50 font-bold"
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsClientModalOpen(false)}
+                            className="w-full py-4 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg active:scale-95 transition-all text-sm"
+                        >
+                            CONFIRMAR CLIENTE
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Product Attributes Modal */}
+            {selectedProduct && (
+                <ProductAttributesModal 
+                    product={selectedProduct}
+                    onClose={() => setSelectedProduct(null)}
+                    onAdd={(selections, obs) => {
+                        addToCart(selectedProduct, selections, obs);
+                        setSelectedProduct(null);
+                    }}
+                />
             )}
 
             {isTableModalOpen && (
@@ -414,45 +547,105 @@ const PosContent = () => {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                         <div className="p-6 border-b flex justify-between items-center bg-gray-50/50">
                             <div>
-                                <h2 className="text-xl font-black text-gray-800 uppercase italic tracking-tight">Vincular/Importar Mesa</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Selecione uma mesa ocupada para importar ou livre para vincular</p>
+                                <h2 className="text-xl font-black text-gray-800 uppercase italic tracking-tight">
+                                    {store?.plano_tipo === 'START' ? 'Pedidos em Produção' : 'Vincular/Importar Mesa'}
+                                </h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                    {store?.plano_tipo === 'START' 
+                                        ? 'Gerencie os pedidos que estão sendo preparados' 
+                                        : 'Selecione uma mesa ocupada para importar ou livre para vincular'}
+                                </p>
                             </div>
                             <button onClick={() => setIsTableModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
                                 <X size={24} className="text-gray-400" />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/30">
                             {loadingMesas ? (
                                 <div className="flex flex-col items-center justify-center py-20 gap-4">
-                                    <Loader2 className="animate-spin text-primary" size={48} />
-                                    <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Carregando Mesas...</p>
+                                    <div className="relative">
+                                        <Loader2 className="animate-spin text-primary" size={48} />
+                                        <ChefHat className="absolute inset-0 m-auto text-primary/30" size={20} />
+                                    </div>
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Sincronizando Produção...</p>
+                                </div>
+                            ) : store?.plano_tipo === 'START' ? (
+                                /* VISUALIZAÇÃO PARA PLANO START: LISTA DE PEDIDOS */
+                                <div className="flex flex-col gap-4">
+                                    {mesas.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                                <ChefHat size={40} className="text-gray-300" />
+                                            </div>
+                                            <h3 className="text-gray-900 font-black italic uppercase tracking-tighter text-lg">Nada pronto no momento</h3>
+                                            <p className="text-gray-400 text-sm font-bold mt-1">Os pedidos aparecerão aqui assim que forem marcados como prontos na cozinha.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {mesas.map((pedido: any) => (
+                                                <button
+                                                    key={pedido.id}
+                                                    onClick={() => handleImportOrder(pedido.id)}
+                                                    className="bg-white p-5 rounded-2xl border-2 border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-xl hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left flex flex-col gap-3 group relative overflow-hidden active:scale-95"
+                                                >
+                                                    <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Plus size={20} className="text-orange-500" />
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 bg-orange-50 rounded-xl flex flex-col items-center justify-center border border-orange-100 text-orange-600 font-black shrink-0">
+                                                            <span className="text-[10px] leading-none mb-0.5 opacity-50">#</span>
+                                                            <span className="text-lg leading-none">{pedido.numero_diario || pedido.id}</span>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h4 className="font-black text-gray-900 uppercase tracking-tight truncate leading-tight">{pedido.cliente_nome}</h4>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-green-100 text-green-600">PRONTO</span>
+                                                                <span className="text-[10px] font-bold text-gray-400">{new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-50">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1">Total do Pedido</span>
+                                                            <span className="text-xl font-black text-orange-600 italic">R$ {parseFloat(pedido.total).toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 group-hover:bg-orange-700 transition-colors">
+                                                            IMPORTAR
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
+                                /* VISUALIZAÇÃO PADRÃO (PRO/ELITE): GRADE DE MESAS */
                                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
                                     {Array.from({ length: store?.quantidade_mesas || 0 }, (_, i) => i + 1).map(num => {
                                         const status = mesas.find(m => String(m.mesa) === String(num));
-                                        const isOccupied = !!status;
                                         return (
                                             <button 
                                                 key={num} 
                                                 onClick={() => handleImportTable(num)}
-                                                className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all p-2 group ${isOccupied 
+                                                className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all p-2 group ${status 
                                                     ? 'bg-red-50 border-red-200 shadow-md shadow-red-500/5' 
                                                     : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl hover:-translate-y-1'
                                                 }`}
                                             >
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isOccupied 
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${status 
                                                     ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
                                                     : 'bg-gray-100 text-gray-400 group-hover:bg-primary/20 group-hover:text-primary'
                                                 }`}>
                                                     <span className="text-lg font-black">{num}</span>
                                                 </div>
-                                                <span className={`text-[9px] font-black uppercase tracking-widest leading-none ${isOccupied ? 'text-red-600' : 'text-gray-300 group-hover:text-primary'}`}>
-                                                    {isOccupied ? 'OCUPADA' : 'LIVRE'}
+                                                <span className={`text-[9px] font-black uppercase tracking-widest leading-none ${status ? 'text-red-600' : 'text-gray-300 group-hover:text-primary'}`}>
+                                                    {status ? 'OCUPADA' : 'LIVRE'}
                                                 </span>
-                                                {isOccupied && (
+                                                {status && (
                                                     <div className="mt-1.5 px-2 py-0.5 bg-red-100 rounded-full border border-red-200">
-                                                        <p className="text-[9px] font-black text-red-700 leading-none">R$ {status.total.toFixed(0)}</p>
+                                                        <p className="text-[9px] font-black text-red-700 leading-none">R$ {status?.total.toFixed(0)}</p>
                                                     </div>
                                                 )}
                                             </button>
@@ -463,6 +656,17 @@ const PosContent = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Order Details Modal for Print Preview */}
+            {lastCreatedOrder && (
+                <PedidoDetailsModal
+                    pedido={lastCreatedOrder}
+                    onClose={() => setLastCreatedOrder(null)}
+                    onAdvance={() => setLastCreatedOrder(null)}
+                    onCancelar={() => setLastCreatedOrder(null)}
+                    storeName={store?.nome}
+                />
             )}
         </div>
     );

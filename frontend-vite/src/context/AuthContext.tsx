@@ -42,12 +42,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(userData);
                 localStorage.setItem('user', JSON.stringify(userData));
 
-                // Also set activeStoreId if not set, taking the first role's store
-                if (!localStorage.getItem('activeStoreId') && userData.roles?.length > 0) {
-                    const firstStoreId = userData.roles[0]?.id;
+                // Also set/validate activeStoreId
+                const roles = userData.roles || [];
+                const currentActiveStoreId = localStorage.getItem('activeStoreId');
+                
+                // Check if current stored ID is valid for this user
+                const isValidStore = roles.some((r: any) => String(r.id) === String(currentActiveStoreId));
+                
+                if (!isValidStore && roles.length > 0) {
+                    const firstStoreId = roles[0]?.id;
                     if (firstStoreId) {
                         localStorage.setItem('activeStoreId', String(firstStoreId));
                     }
+                } else if (!currentActiveStoreId && roles.length > 0) {
+                    const firstStoreId = roles[0]?.id;
+                    localStorage.setItem('activeStoreId', String(firstStoreId));
                 }
 
                 return userData;

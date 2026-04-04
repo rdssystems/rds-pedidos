@@ -123,7 +123,7 @@ export const OrderListSimplified = () => {
             const end = new Date(start);
             end.setDate(end.getDate() + 1);
 
-            const url = `/api/pedidos/?start_date=${start.toISOString()}&end_date=${end.toISOString()}&include_pending=true`;
+            const url = `/api/pedidos/?start_date=${start.toISOString()}&end_date=${end.toISOString()}`;
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -158,21 +158,101 @@ export const OrderListSimplified = () => {
     }, [lastMessage, selectedPedido]);
 
     const handleFinalizar = async (id: number) => {
+        const pedido = pedidos.find(p => p.id === id);
+        if (!pedido) return;
+
+        let nextStatus = '';
+        const currentStatus = pedido.status;
+        const tipo = pedido.tipo;
+
+        if (store?.plano_tipo === 'START') {
+            const statusMap: Record<string, string> = {
+                'NOVO': 'PREPARO',
+                'PREPARO': 'PRONTO',
+                'PRONTO': 'FINALIZADO',
+                'DESPACHADO': 'FINALIZADO'
+            };
+            nextStatus = statusMap[currentStatus];
+        } else {
+            const statusMap: Record<string, string> = {
+                'NOVO': 'PREPARO',
+                'PREPARO': 'PRONTO',
+                'PRONTO': tipo !== 'ENTREGA' ? 'FINALIZADO' : 'DESPACHADO',
+                'DESPACHADO': 'FINALIZADO',
+            };
+            nextStatus = statusMap[currentStatus];
+        }
+
+        if (!nextStatus) return;
+
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/pedidos/${id}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: 'FINALIZADO' })
-            });
-            if (response.ok) {
-                setPedidos(prev => prev.map(p => p.id === id ? { ...p, status: 'FINALIZADO' } : p));
+            const ok = await patchPedidoStatus(id, nextStatus);
+            if (ok) {
+                setPedidos(prev => prev.map(p => p.id === id ? { ...p, status: nextStatus } : p));
             }
         } catch (error) {
             console.error('Error finalizing order:', error);
+        }
+    };
+
+    const patchPedidoStatus = async (pedidoId: number, newStatus: string): Promise<boolean> => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/pedidos/${pedidoId}/`, {
+                method: 'PATCH',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!response.ok) { 
+                alert(`Erro ao atualizar pedido (${response.status}).`); 
+                return false; 
+            }
+            return true;
+        } catch { 
+            alert('Erro de conexão ao atualizar pedido.'); 
+            return false; 
+        }
+    };
+
+    const handleModalAdvance = async (pedidoId: number, currentStatus: string, tipo: string) => {
+        let nextStatus = '';
+        
+        if (store?.plano_tipo === 'START') {
+            const statusMap: Record<string, string> = {
+                'NOVO': 'PREPARO',
+                'PREPARO': 'PRONTO',
+                'PRONTO': 'FINALIZADO',
+                'DESPACHADO': 'FINALIZADO'
+            };
+            nextStatus = statusMap[currentStatus];
+        } else {
+            const statusMap: Record<string, string> = {
+                'NOVO': 'PREPARO',
+                'PREPARO': 'PRONTO',
+                'PRONTO': tipo !== 'ENTREGA' ? 'FINALIZADO' : 'DESPACHADO',
+                'DESPACHADO': 'FINALIZADO',
+            };
+            nextStatus = statusMap[currentStatus];
+        }
+
+        if (!nextStatus) return;
+        
+        const ok = await patchPedidoStatus(pedidoId, nextStatus);
+        if (ok) {
+            setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: nextStatus } : p));
+            setSelectedPedido(null);
+        }
+    };
+
+    const handleCancelarPedido = async (pedidoId: number) => {
+        if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
+        const ok = await patchPedidoStatus(pedidoId, 'CANCELADO');
+        if (ok) {
+            setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: 'CANCELADO' } : p));
+            setSelectedPedido(null);
         }
     };
 
@@ -194,8 +274,8 @@ export const OrderListSimplified = () => {
     }
 
     return (
-        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-            <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="w-full px-4 md:px-6 py-6 h-full flex flex-col">
+            <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-6 shrink-0">
                 <div>
                     <h1 className="text-2xl font-black italic uppercase text-gray-900 tracking-tighter">Fila de Pedidos</h1>
                     <p className="text-gray-500 text-sm font-medium">Gerencie sua produção de hoje.</p>
@@ -230,77 +310,154 @@ export const OrderListSimplified = () => {
                 </div>
             </header>
 
-            <div className="space-y-4">
-                {pedidos.length === 0 ? (
-                    <div className="bg-white rounded-[2rem] p-12 text-center border-2 border-dashed border-gray-100">
-                        <Package className="mx-auto text-gray-100 mb-4" size={64} />
-                        <h3 className="text-gray-900 font-black italic uppercase tracking-tighter text-xl">Nenhum pedido</h3>
-                        <p className="text-gray-400 text-sm font-bold mt-1">Nenhum registro encontrado para este dia.</p>
-                    </div>
-                ) : (
-                    pedidos.map((pedido) => (
-                        <div
-                            key={pedido.id}
-                            onClick={() => setSelectedPedido(pedido)}
-                            className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-md transition-shadow cursor-pointer group"
-                        >
-                            <div className="flex items-start sm:items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-lg sm:rounded-xl flex flex-col items-center justify-center border border-gray-100 group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors shrink-0">
-                                    <span className="text-[8px] sm:text-[10px] font-bold text-gray-400 leading-none">#</span>
-                                    <span className="text-base sm:text-lg font-black text-gray-900 leading-none">{pedido.numero_diario || pedido.id}</span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-sm sm:text-base text-gray-900 flex items-center gap-2 truncate">
-                                        <span className="truncate">{pedido.cliente_nome}</span>
-                                        {pedido.tipo === 'ENTREGA' && <span className="text-[8px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Entrega</span>}
-                                        {pedido.tipo === 'RETIRADA' && <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Retirada</span>}
-                                        {pedido.tipo === 'BALCAO' && <span className="text-[8px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Balcão</span>}
-                                        {pedido.tipo === 'MESA' && <span className="text-[8px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-black uppercase shrink-0">Mesa</span>}
-                                    </h3>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${STATUS_LABELS[pedido.status]?.bg} ${STATUS_LABELS[pedido.status]?.color}`}>
-                                            {STATUS_LABELS[pedido.status]?.label || pedido.status}
-                                        </span>
-                                        <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1 font-medium">
-                                            <Clock size={10} className="sm:w-3 sm:h-3" /> {new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between sm:justify-end gap-4 mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-50">
-                                <div className="text-left sm:text-right">
-                                    <span className="block text-[8px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Total</span>
-                                    <span className="text-sm sm:text-lg font-black text-red-500 leading-none">R$ {parseFloat(pedido.total).toFixed(2)}</span>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    {pedido.status !== 'FINALIZADO' && pedido.status !== 'CANCELADO' && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleFinalizar(pedido.id); }}
-                                            disabled={userRoles.includes('waiter') && pedido.status !== 'NOVO'}
-                                            className="bg-green-500 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                                        >
-                                            <CheckCircle2 size={14} className="sm:w-4 sm:h-4" /> Finalizar
-                                        </button>
-                                    )}
-                                    <button className="p-1 sm:p-2 text-gray-400 group-hover:text-primary hover:bg-gray-50 rounded-lg transition-all mt-0">
-                                        <ChevronRight size={16} className="sm:w-5 sm:h-5" />
-                                    </button>
-                                </div>
-                            </div>
+            {store?.plano_tipo === 'START' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start h-[calc(100vh-220px)] overflow-hidden pb-4">
+                    {/* COLUNA 1: NOVOS */}
+                    <div className="flex flex-col h-full bg-blue-50/20 rounded-3xl border border-blue-100/30 p-3">
+                        <div className="flex items-center justify-between mb-3 px-2">
+                            <h2 className="font-black italic uppercase text-[11px] text-blue-600 tracking-tighter">1. Novos</h2>
+                            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg shadow-blue-500/20">
+                                {pedidos.filter(p => p.status === 'NOVO' && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).length}
+                            </span>
                         </div>
-                    ))
-                )}
-            </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+                            {pedidos.filter(p => p.status === 'NOVO' && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).map(pedido => (
+                                <OrderCardItem key={pedido.id} pedido={pedido} onClick={() => setSelectedPedido(pedido)} onFinalizar={handleFinalizar} plano_tipo={store?.plano_tipo} />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* COLUNA 2: PREPARO */}
+                    <div className="flex flex-col h-full bg-orange-50/20 rounded-3xl border border-orange-100/30 p-3">
+                        <div className="flex items-center justify-between mb-3 px-2">
+                            <h2 className="font-black italic uppercase text-[11px] text-orange-600 tracking-tighter">2. Preparo</h2>
+                            <span className="bg-orange-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg shadow-orange-500/20">
+                                {pedidos.filter(p => p.status === 'PREPARO' && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).length}
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+                            {pedidos.filter(p => p.status === 'PREPARO' && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).map(pedido => (
+                                <OrderCardItem key={pedido.id} pedido={pedido} onClick={() => setSelectedPedido(pedido)} onFinalizar={handleFinalizar} plano_tipo={store?.plano_tipo} />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* COLUNA 3: PRONTOS */}
+                    <div className="flex flex-col h-full bg-teal-50/20 rounded-3xl border border-teal-100/30 p-3">
+                        <div className="flex items-center justify-between mb-3 px-2">
+                            <h2 className="font-black italic uppercase text-[11px] text-teal-600 tracking-tighter">3. Prontos</h2>
+                            <span className="bg-teal-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg shadow-teal-500/20">
+                                {pedidos.filter(p => ['PRONTO', 'DESPACHADO'].includes(p.status) && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).length}
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+                            {pedidos.filter(p => ['PRONTO', 'DESPACHADO'].includes(p.status) && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).map(pedido => (
+                                <OrderCardItem key={pedido.id} pedido={pedido} onClick={() => setSelectedPedido(pedido)} onFinalizar={handleFinalizar} plano_tipo={store?.plano_tipo} />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* COLUNA 4: FINALIZADO */}
+                    <div className="flex flex-col h-full bg-green-50/20 rounded-3xl border border-green-100/30 p-3">
+                        <div className="flex items-center justify-between mb-3 px-1 ml-1">
+                            <h2 className="font-black italic uppercase text-[11px] text-green-600 tracking-tighter">4. Finalizado</h2>
+                            <span className="bg-green-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg shadow-green-500/20">
+                                {pedidos.filter(p => ['FINALIZADO', 'CANCELADO'].includes(p.status) && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).length}
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+                            {pedidos.filter(p => ['FINALIZADO', 'CANCELADO'].includes(p.status) && (p.tipo === 'ENTREGA' || p.tipo === 'BALCAO')).map(pedido => (
+                                <OrderCardItem key={pedido.id} pedido={pedido} onClick={() => setSelectedPedido(pedido)} onFinalizar={handleFinalizar} plano_tipo={store?.plano_tipo} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {pedidos.length === 0 ? (
+                        <div className="bg-white rounded-[2rem] p-12 text-center border-2 border-dashed border-gray-100">
+                            <Package className="mx-auto text-gray-100 mb-4" size={64} />
+                            <h3 className="text-gray-900 font-black italic uppercase tracking-tighter text-xl">Nenhum pedido</h3>
+                            <p className="text-gray-400 text-sm font-bold mt-1">Nenhum registro encontrado para este dia.</p>
+                        </div>
+                    ) : (
+                        pedidos.map((pedido) => (
+                            <OrderCardItem key={pedido.id} pedido={pedido} onClick={() => setSelectedPedido(pedido)} onFinalizar={handleFinalizar} plano_tipo={store?.plano_tipo} />
+                        ))
+                    )}
+                </div>
+            )}
 
             {selectedPedido && (
                 <PedidoDetailsModal
-                    pedido={selectedPedido}
+                    pedido={selectedPedido as any}
                     onClose={() => setSelectedPedido(null)}
-                    onStatusChange={handleStatusChange}
+                    onAdvance={handleModalAdvance}
+                    onCancelar={handleCancelarPedido}
+                    storeName={store?.nome}
                 />
             )}
         </div>
     );
 };
+
+// Extracted Component for Order Card
+const OrderCardItem = ({ pedido, onClick, onFinalizar, plano_tipo }: { pedido: Pedido, onClick: () => void, onFinalizar: (id: number) => void, plano_tipo?: string }) => (
+    <div
+        onClick={onClick}
+        className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 flex flex-col gap-2.5 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group relative"
+    >
+        <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 bg-gray-50 rounded-lg flex flex-col items-center justify-center border border-gray-100 group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors shrink-0">
+                    <span className="text-[9px] font-black text-gray-400 leading-none mb-0.5">#</span>
+                    <span className="text-[14px] font-black text-gray-900 leading-none">{pedido.numero_diario || pedido.id}</span>
+                </div>
+                <div className="min-w-0 flex flex-col">
+                    <h3 className="font-black text-[13px] text-gray-900 truncate uppercase tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">{pedido.cliente_nome}</h3>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {pedido.tipo === 'ENTREGA' && (
+                            <span className="text-[8px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter">Entrega</span>
+                        )}
+                        {pedido.tipo === 'BALCAO' && (
+                            <span className="text-[8px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter">Balcão</span>
+                        )}
+                        <span className="text-[9px] text-gray-300 flex items-center gap-1 font-bold">
+                            <Clock size={10} className="text-gray-300" /> 
+                            {new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div className="text-right shrink-0">
+                <div className="text-[12px] font-black text-red-600 italic flex items-baseline justify-end">
+                    <span className="text-[8px] not-italic mr-0.5 text-gray-300 font-bold uppercase tracking-widest">Total</span>
+                    R$ {parseFloat(pedido.total).toFixed(2)}
+                </div>
+            </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-gray-50/80 pt-3 mt-1">
+            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${STATUS_LABELS[pedido.status]?.bg} ${STATUS_LABELS[pedido.status]?.color} border border-current/10`}>
+                {STATUS_LABELS[pedido.status]?.label || pedido.status}
+            </span>
+            <div className="flex items-center gap-2">
+                {pedido.status !== 'FINALIZADO' && pedido.status !== 'CANCELADO' && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onFinalizar(pedido.id); }}
+                        className="bg-green-500 text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-green-600 shadow-md shadow-green-500/10 active:scale-95 transition-all outline-none"
+                    >
+                        <CheckCircle2 size={13} />
+                        {plano_tipo === 'START' ? (
+                            pedido.status === 'NOVO' ? 'PREPARAR' : 
+                            pedido.status === 'PREPARO' ? 'PRONTO' : 'CONCLUIR'
+                        ) : 'CONCLUIR'}
+                    </button>
+                )}
+                <div className="w-7 h-7 rounded-full bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                    <ChevronRight size={16} />
+                </div>
+            </div>
+        </div>
+    </div>
+);

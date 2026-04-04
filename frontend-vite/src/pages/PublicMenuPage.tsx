@@ -54,25 +54,38 @@ export default function PublicMenuPage() {
     const { customer, isAuthenticated } = useCustomer();
 
     // Checkout State
-    const [view, setView] = useState<'cart' | 'checkout'>('cart');
+    const [view, setView] = useState<'cart' | 'checkout' | 'success'>('cart');
+    const [orderSuccessData, setOrderSuccessData] = useState<{ storePhone: string; pedidoId: number | null; whatsappLink: string } | null>(null);
+    const [isCepLoading, setIsCepLoading] = useState(false);
     const [checkoutData, setCheckoutData] = useState({
-        nome: '',
-        telefone: '',
-        endereco_rua: '',
-        endereco_numero: '',
-        endereco_bairro: '',
+        nome: localStorage.getItem('rds_customer_name') || '',
+        telefone: localStorage.getItem('rds_customer_phone') || '',
+        endereco_rua: localStorage.getItem('rds_customer_address') || '',
+        endereco_numero: localStorage.getItem('rds_customer_number') || '',
+        endereco_bairro: localStorage.getItem('rds_customer_district') || '',
+        cep: localStorage.getItem('rds_customer_cep') || '',
         pagamento: 'PIX' as PaymentMethod,
         metodo_entrega: 'ENTREGA' as DeliveryMethod,
         troco: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Save common user data to cache whenever it changes
+    useEffect(() => {
+        if (checkoutData.nome) localStorage.setItem('rds_customer_name', checkoutData.nome);
+        if (checkoutData.telefone) localStorage.setItem('rds_customer_phone', checkoutData.telefone);
+        if (checkoutData.endereco_rua) localStorage.setItem('rds_customer_address', checkoutData.endereco_rua);
+        if (checkoutData.endereco_numero) localStorage.setItem('rds_customer_number', checkoutData.endereco_numero);
+        if (checkoutData.endereco_bairro) localStorage.setItem('rds_customer_district', checkoutData.endereco_bairro);
+        if (checkoutData.cep) localStorage.setItem('rds_customer_cep', checkoutData.cep);
+    }, [checkoutData.nome, checkoutData.telefone, checkoutData.endereco_rua, checkoutData.endereco_numero, checkoutData.endereco_bairro, checkoutData.cep]);
+
     useEffect(() => {
         if (customer) {
             setCheckoutData(prev => ({
                 ...prev,
-                nome: customer.name,
-                telefone: customer.phone,
+                nome: customer.name || prev.nome,
+                telefone: customer.phone || prev.telefone,
                 endereco_rua: customer.address_rua || prev.endereco_rua,
                 endereco_numero: customer.address_numero || prev.endereco_numero,
                 endereco_bairro: customer.address_bairro || prev.endereco_bairro
@@ -194,21 +207,17 @@ export default function PublicMenuPage() {
     const getImageUrl = (url: string | null) => {
         if (!url || url === '') return '/logo-perfil.png';
         
-        // Se a busca encontrar um padrão de URL (http ou https)
         if (url.startsWith('http')) {
-            // Removemos qualquer domínio, sobrando apenas o caminho (/media/...)
             try {
                 const parsed = new URL(url);
                 return parsed.pathname;
             } catch (e) {
-                // Fallback se falhar o parse
                 if (url.includes('/media/')) {
                     return '/media/' + url.split('/media/')[1];
                 }
             }
         }
         
-        // Garante que o caminho comece com barra
         if (!url.startsWith('/') && !url.startsWith('http')) {
             return `/media/${url}`;
         }
@@ -226,14 +235,34 @@ export default function PublicMenuPage() {
         return cleaned;
     };
 
+    const fetchViaCep = async (cep: string) => {
+        const digits = cep.replace(/\D/g, '');
+        if (digits.length !== 8) return;
+        setIsCepLoading(true);
+        try {
+            const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+            const data = await res.json();
+            if (!data.erro) {
+                setCheckoutData(prev => ({
+                    ...prev,
+                    endereco_rua: data.logradouro || prev.endereco_rua,
+                    ...(store?.tipo_taxa_entrega !== 'BAIRRO' ? { endereco_bairro: data.bairro || prev.endereco_bairro } : {}),
+                }));
+            }
+        } catch { /* silent fail */ } finally {
+            setIsCepLoading(false);
+        }
+    };
+
+    const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+        const formatted = raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw;
+        setCheckoutData(prev => ({ ...prev, cep: formatted }));
+        if (raw.length === 8) fetchViaCep(raw);
+    };
+
     const handleSubmitOrder = async () => {
         if (!store) return;
-
-        // AUTH CHECK - Guest Login
-        if (!isAuthenticated) {
-            setIsAuthModalOpen(true);
-            return;
-        }
 
         if (!isOpenStatus.open) {
             alert('A loja está fechada no momento. Confira o horário de funcionamento.');
@@ -269,7 +298,7 @@ export default function PublicMenuPage() {
         }
 
         const fullAddress = checkoutData.metodo_entrega === 'ENTREGA'
-            ? `${checkoutData.endereco_rua}, ${checkoutData.endereco_numero} - ${checkoutData.endereco_bairro}`
+            ? `${checkoutData.endereco_rua}, ${checkoutData.endereco_numero} - ${checkoutData.endereco_bairro} ${checkoutData.cep ? `(CEP: ${checkoutData.cep})` : ''}`
             : 'Retirada na Loja';
 
         setIsSubmitting(true);
@@ -309,8 +338,12 @@ export default function PublicMenuPage() {
                 throw new Error('Falha ao criar pedido: ' + err);
             }
 
-            // WhatsApp Message Generation...
-            const orderId = `#${Date.now().toString().slice(-4)}`;
+            const pedidoResponse = await response.json();
+            const pedidoId = pedidoResponse?.id || null;
+
+            const storePhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
+
+            const orderId = pedidoResponse?.numero_diario ? `#${pedidoResponse.numero_diario}` : `#${Date.now().toString().slice(-4)}`;
             let message = `*🔔 NOVO PEDIDO ${orderId}* 🔔\n\n`;
             message += `👤 *Cliente:* ${checkoutData.nome}\n`;
             if (checkoutData.telefone) message += `📞 *Contato:* ${checkoutData.telefone}\n\n`;
@@ -344,27 +377,16 @@ export default function PublicMenuPage() {
             message += `\n_Pedido enviado via Cardápio Digital_`;
 
             const encoded = encodeURIComponent(message);
-            const storePhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
-            window.open(`https://wa.me/${storePhone}?text=${encoded}`, '_blank');
-
-            clearCart();
-            setIsCartOpen(false);
-            setView('cart');
-            setCheckoutData({
-                nome: '',
-                telefone: '',
-                endereco_rua: '',
-                endereco_numero: '',
-                endereco_bairro: '',
-                pagamento: 'PIX',
-                metodo_entrega: 'ENTREGA',
-                troco: ''
-            });
+            const whatsappLink = `https://wa.me/${storePhone}?text=${encoded}`;
 
             localStorage.setItem('activeStoreId', store.id.toString());
             setStoreId(store.id);
 
-            alert('Pedido enviado com sucesso!');
+            clearCart();
+            setCheckoutData(prev => ({ ...prev, pagamento: 'PIX', troco: '' }));
+
+            setOrderSuccessData({ storePhone, pedidoId, whatsappLink });
+            setView('success');
         } catch (error) {
             console.error(error);
             alert('Ocorreu um erro ao enviar o pedido.');
@@ -386,7 +408,6 @@ export default function PublicMenuPage() {
 
     return (
         <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans">
-            {/* 1. TOPO INFO BAR */}
             <div className="bg-white border-b border-gray-200 py-2 hidden sm:block sticky top-0 z-[60] shadow-sm">
                 <div className="max-w-[1400px] mx-auto px-6 flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                     <div className="flex items-center gap-6">
@@ -410,9 +431,7 @@ export default function PublicMenuPage() {
                 </div>
             </div>
 
-            {/* 2. BANNER & HEADER SECTION */}
             <header className="relative">
-                {/* Banner Background */}
                 <div className="h-48 md:h-64 w-full relative overflow-hidden">
                     {store.banner ? (
                         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${getImageUrl(store.banner)})` }}>
@@ -425,7 +444,6 @@ export default function PublicMenuPage() {
                     )}
                 </div>
 
-                {/* Profile Overlay */}
                 <div className="max-w-[1400px] mx-auto px-6 relative -mt-16 md:-mt-12 z-10">
                     <div className="flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
                         <div className="relative group">
@@ -443,19 +461,24 @@ export default function PublicMenuPage() {
                                     {isOpenStatus.open ? (
                                         <div className="bg-green-50 text-green-700 border border-green-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                            Recebendo Pedidos Agora
+                                            Aberto Agora ({(() => {
+                                                const h = store.horario_funcionamento?.[DIAS_MAP[new Date().getDay()]];
+                                                return h && !h.closed && h.close ? `até ${h.close}` : 'Hoje';
+                                            })()})
                                         </div>
                                     ) : (
                                         <div className="bg-red-50 text-red-700 border border-red-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-red-400"></div>
-                                            Loja Fechada
+                                            Loja Fechada {(() => {
+                                                const h = store.horario_funcionamento?.[DIAS_MAP[new Date().getDay()]];
+                                                return h && !h.closed && h.open ? `- Abre às ${h.open}` : '';
+                                            })()}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* NAV / USER ACTIONS (Desktop) */}
                         <div className="hidden lg:flex items-center gap-3 pb-6">
                             <div className="relative group max-w-[200px]">
                                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
@@ -467,75 +490,16 @@ export default function PublicMenuPage() {
                                     className="w-full pl-9 pr-4 h-12 bg-white rounded-lg border border-gray-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
                                 />
                             </div>
-
-                            {isAuthenticated ? (
-                                <>
-                                    <Link to={`/s/${slug}/orders`} className="bg-white px-5 h-12 rounded-lg shadow-sm border border-gray-100 flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-gray-700 hover:text-primary transition-all">
-                                        <List size={18} />
-                                        Meus Pedidos
-                                    </Link>
-                                    <div 
-                                        onClick={() => setIsAuthModalOpen(true)}
-                                        className="flex items-center gap-3 bg-white px-4 h-12 rounded-lg border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors group/user"
-                                    >
-                                        <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-primary font-bold text-xs border border-gray-100 group-hover/user:border-primary/30 transition-colors">
-                                            {customer?.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="hidden xl:block">
-                                            <p className="text-[10px] font-bold text-gray-900 leading-none group-hover/user:text-primary transition-colors">{customer?.name}</p>
-                                            <p className="text-[9px] text-gray-400 font-medium mt-0.5">{customer?.phone}</p>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <button 
-                                    onClick={() => setIsAuthModalOpen(true)}
-                                    className="bg-white px-6 h-12 rounded-lg shadow-sm border border-gray-100 flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-gray-700 hover:text-primary hover:border-primary/20 transition-all"
-                                >
-                                    <LogIn size={18} />
-                                    Entrar
-                                </button>
-                            )}
                         </div>
                     </div>
 
-                    {/* MOBILE USER PROFILE (Visible only on mobile/tablet) */}
                     <div className="lg:hidden mt-6 pb-2">
-                        {isAuthenticated ? (
-                            <div 
-                                onClick={() => setIsAuthModalOpen(true)}
-                                className="bg-white/95 backdrop-blur-md p-4 rounded-lg shadow-lg border border-gray-100 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-primary font-bold text-sm border border-gray-100">
-                                        {customer?.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-900 leading-tight">{customer?.name}</p>
-                                        <p className="text-[10px] text-gray-400 font-medium mt-0.5">{customer?.phone}</p>
-                                    </div>
-                                </div>
-                                <div className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/5 px-3 py-1.5 rounded-md">
-                                    Editar Perfil
-                                </div>
-                            </div>
-                        ) : (
-                            <button 
-                                onClick={() => setIsAuthModalOpen(true)}
-                                className="w-full bg-white/95 backdrop-blur-md p-4 rounded-lg shadow-lg border border-gray-100 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest text-gray-700 active:scale-[0.98] transition-all"
-                            >
-                                <LogIn size={18} className="text-primary" />
-                                Entrar / Identificar-se
-                            </button>
-                        )}
                     </div>
                 </div>
             </header>
 
-            {/* 3. MAIN CONTENT: 3 COLUMNS */}
             <main className="max-w-[1400px] mx-auto w-full px-6 py-12 flex gap-8">
                 
-                {/* A. CATEGORY SIDEBAR */}
                 <CategorySidebar 
                     categories={store.categorias} 
                     activeCategory={activeCategory} 
@@ -546,10 +510,8 @@ export default function PublicMenuPage() {
                     accentColor={store.cor_primaria} 
                 />
 
-                {/* B. CENTRAL PRODUCTS GRID */}
                 <div className="flex-1 space-y-10">
                     <div className="space-y-4">
-                        {/* Search Bar - Rectangular Enterprise Style */}
                         <div className="relative group max-w-2xl">
                             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-300">
                                 <Search size={18} style={{ color: store.cor_primaria || '#007A87' }} />
@@ -563,7 +525,6 @@ export default function PublicMenuPage() {
                             />
                         </div>
 
-                        {/* Mobile Category Selector */}
                         <div className="md:hidden">
                             <div className="relative">
                                 <select 
@@ -590,7 +551,6 @@ export default function PublicMenuPage() {
                         </div>
                     </div>
 
-                    {/* Products Sections */}
                     {filteredCategories.map((cat, idx) => (
                         <section key={cat.id} id={`cat-${cat.id}`} className="animate-fade-in">
                             <div className="flex items-center gap-4 mb-6">
@@ -621,7 +581,6 @@ export default function PublicMenuPage() {
                         </div>
                     )}
 
-                    {/* WHATSAPP BAR */}
                     <button 
                         onClick={() => window.open(`https://wa.me/${formatWhatsappNumber(store.whatsapp)}`)}
                         className="w-full bg-white border-2 border-gray-100 p-8 rounded-[3rem] flex items-center justify-between group hover:border-green-500 transition-all duration-500 shadow-sm"
@@ -635,7 +594,6 @@ export default function PublicMenuPage() {
                     </button>
                 </div>
 
-                {/* C. SHOPPING BAG (DESKTOP) */}
                 <aside className="hidden xl:block w-80 sticky top-24 self-start max-h-[calc(100vh-120px)] flex flex-col pt-2">
                     <div className="bg-[#F8F9FA] rounded-lg border border-gray-200 flex flex-col h-full overflow-hidden">
                         <div className="p-6 bg-white border-b border-gray-100 flex justify-between items-center">
@@ -688,8 +646,8 @@ export default function PublicMenuPage() {
                                     </div>
                                 </div>
                                 <button 
-                                    onClick={() => setIsCartOpen(true)} // Open mobile view for checkout
-                                    className="w-full py-4 bg-gray-900 hover:bg-black text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-3"
+                                    onClick={() => setIsCartOpen(true)}
+                                    className="w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-3"
                                 >
                                     FINALIZAR PEDIDO
                                     <ChevronRight size={16} />
@@ -700,11 +658,10 @@ export default function PublicMenuPage() {
                 </aside>
             </main>
 
-            {/* MOBILE CART BUTTON */}
             <div className="lg:hidden fixed bottom-8 left-6 right-6 z-50">
                 <button 
                     onClick={() => setIsCartOpen(true)}
-                    className="w-full h-16 bg-gray-900 text-white rounded-xl shadow-2xl flex items-center justify-between px-8 transition-all hover:scale-[1.02] active:scale-95 group overflow-hidden"
+                    className="w-full h-16 bg-green-500 text-white rounded-xl shadow-2xl flex items-center justify-between px-8 transition-all hover:scale-[1.02] active:scale-95 group overflow-hidden"
                 >
                     <div className="flex items-center gap-4">
                         <div className="bg-white/20 rounded-lg w-8 h-8 flex items-center justify-center text-xs font-bold backdrop-blur-md">
@@ -717,10 +674,9 @@ export default function PublicMenuPage() {
                 </button>
             </div>
 
-            {/* CART MODAL (For Checkout & Mobile) */}
             {isCartOpen && (
-                <div className="fixed inset-0 bg-black/60 shadow-inner z-[100] flex justify-end transition-all">
-                    <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col md:rounded-l-xl overflow-hidden animate-slide-left">
+                <div className="fixed inset-0 bg-black/60 shadow-inner z-[100] flex justify-end overflow-hidden transition-all">
+                    <div className="bg-white w-full max-w-lg h-screen shadow-2xl flex flex-col md:rounded-l-3xl overflow-hidden animate-slide-left relative">
                         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
                             <div>
                                 <h2 className="text-xl font-bold uppercase tracking-widest text-gray-900 leading-none">{view === 'cart' ? 'Sua Sacola' : 'Finalizar'}</h2>
@@ -731,28 +687,8 @@ export default function PublicMenuPage() {
                             <button onClick={() => { setIsCartOpen(false); setView('cart'); }} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"><X size={20} /></button>
                         </div>
 
-                        {/* Profile Info in Drawer */}
-                        {isAuthenticated && (
-                            <div className="px-8 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-primary font-bold text-xs border border-gray-100">
-                                        {customer?.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <p className="text-[11px] font-bold text-gray-900 leading-tight">{customer?.name}</p>
-                                        <p className="text-[9px] text-gray-400 font-medium">{customer?.phone}</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => setIsAuthModalOpen(true)}
-                                    className="text-[9px] font-bold text-primary uppercase tracking-widest hover:underline"
-                                >
-                                    Alterar
-                                </button>
-                            </div>
-                        )}
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto px-6 md:px-8 py-6 space-y-4 md:space-y-6 custom-scrollbar">
                             {view === 'cart' ? (
                                 <>
                                     {cart.map(item => (
@@ -805,6 +741,22 @@ export default function PublicMenuPage() {
                                     {checkoutData.metodo_entrega === 'ENTREGA' && (
                                         <div className="space-y-3 animate-slide-up pt-2">
                                              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 border-l-2 pl-3" style={{ borderColor: store.cor_primaria }}>Endereço</h3>
+
+                                             {/* CEP primeiro com auto-fill ViaCEP */}
+                                             <div className="relative">
+                                                 <input
+                                                     type="text"
+                                                     value={checkoutData.cep}
+                                                     onChange={handleCepChange}
+                                                     className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm pr-12"
+                                                     placeholder="CEP (ex: 01310-100)"
+                                                     maxLength={9}
+                                                 />
+                                                 {isCepLoading && (
+                                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+                                                 )}
+                                             </div>
+
                                              <input type="text" value={checkoutData.endereco_rua} onChange={(e) => setCheckoutData({ ...checkoutData, endereco_rua: e.target.value })} className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm" placeholder="Rua / Avenida" />
                                              <div className="grid grid-cols-2 gap-3">
                                                  <input type="text" value={checkoutData.endereco_numero} onChange={(e) => setCheckoutData({ ...checkoutData, endereco_numero: e.target.value })} className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm" placeholder="Nº" />
@@ -843,8 +795,9 @@ export default function PublicMenuPage() {
                             )}
                         </div>
 
-                        <div className="p-8 bg-white border-t border-gray-100 space-y-4 pb-12">
-                             <div className="space-y-2">
+                        <div className="p-6 md:p-8 bg-white border-t border-gray-100 space-y-4 pb-12 sticky bottom-0">
+                              {view !== 'success' && (
+                              <div className="space-y-2">
                                 <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span>Subtotal</span><span>{formatCurrency(total)}</span></div>
                                 <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span>Taxa Entrega</span><span>{formatCurrency(deliveryFee)}</span></div>
                                 <div className="flex justify-between items-end pt-3">
@@ -852,19 +805,44 @@ export default function PublicMenuPage() {
                                     <span className="text-3xl font-bold tracking-tight text-gray-900">{formatCurrency(grandTotal)}</span>
                                 </div>
                              </div>
+                              )}
 
                             {view === 'cart' ? (
                                 <button 
                                     onClick={() => setView('checkout')} 
                                     disabled={cart.length === 0} 
-                                    className="w-full py-5 bg-gray-900 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-black active:scale-[0.98] transition-all disabled:opacity-50"
+                                    className="w-full py-5 bg-green-500 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-green-600 active:scale-[0.98] transition-all disabled:opacity-50"
                                 >
                                     PROSSEGUIR
                                 </button>
+                            ) : view === 'success' ? (
+                                <div className="space-y-3 animate-slide-up">
+                                    <div className="text-center py-4">
+                                        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+                                            <svg className="w-7 h-7 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        </div>
+                                        <p className="font-bold text-gray-900 text-sm">Pedido enviado com sucesso!</p>
+                                        <p className="text-xs text-gray-400 mt-1">Acompanhe o status pelo WhatsApp da loja</p>
+                                    </div>
+                                    <a
+                                        href={orderSuccessData?.whatsappLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full flex items-center justify-center gap-3 py-4 bg-green-500 text-white rounded-lg font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-green-600 transition-all"
+                                    >
+                                        <Phone size={18} fill="white" /> Acompanhar pelo WhatsApp
+                                    </a>
+                                    <button
+                                        onClick={() => { setIsCartOpen(false); setView('cart'); setOrderSuccessData(null); }}
+                                        className="w-full py-3 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-gray-50 transition-all"
+                                    >
+                                        Voltar ao Cardápio
+                                    </button>
+                                </div>
                             ) : (
                                 <div className="flex gap-3">
                                     <button onClick={() => setView('cart')} className="px-6 py-5 bg-white text-gray-900 border border-gray-200 rounded-lg font-bold text-[11px] uppercase tracking-widest hover:bg-gray-50 transition-all">Voltar</button>
-                                    <button onClick={handleSubmitOrder} disabled={isSubmitting} className="flex-1 py-5 bg-gray-900 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-black active:scale-[0.98] transition-all text-center">
+                                    <button onClick={handleSubmitOrder} disabled={isSubmitting} className="flex-1 py-5 bg-green-500 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-green-600 active:scale-[0.98] transition-all text-center">
                                          {isSubmitting ? 'ENVIANDO...' : 'ENVIAR PEDIDO'}
                                     </button>
                                 </div>
@@ -874,7 +852,6 @@ export default function PublicMenuPage() {
                 </div>
             )}
 
-            {/* PRODUCT MODAL */}
             {selectedProduct && (
                 <ProductModal
                     isOpen={!!selectedProduct}
@@ -889,7 +866,6 @@ export default function PublicMenuPage() {
                 />
             )}
 
-            {/* DELIVERY CALCULATOR MODAL */}
             {isDeliveryModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
                     <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-slide-up">
@@ -928,12 +904,6 @@ export default function PublicMenuPage() {
                     </div>
                 </div>
             )}
-            {/* AUTH MODAL */}
-            <PublicAuthModal 
-                isOpen={isAuthModalOpen} 
-                onClose={() => setIsAuthModalOpen(false)} 
-                accentColor={store.cor_primaria} 
-            />
         </div>
     );
 }

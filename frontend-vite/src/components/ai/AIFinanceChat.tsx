@@ -26,13 +26,14 @@ export default function AIFinanceChat() {
     const isEligible = store?.plano_tipo === 'PRO' || store?.plano_tipo === 'ELITE';
     const isOwner = user?.roles?.some(r => r.role === 'owner');
 
-    if (!isOwner) return null;
-
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
+
+    if (!isOwner) return null;
+
 
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();

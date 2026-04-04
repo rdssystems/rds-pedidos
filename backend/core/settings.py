@@ -30,6 +30,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://rdspedidos.com.br',
     'https://www.rdspedidos.com.br',
     'https://app.rdspedidos.com.br',
+    'http://localhost:5173',
 ]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
