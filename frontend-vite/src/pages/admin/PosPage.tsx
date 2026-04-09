@@ -634,6 +634,11 @@ const { caixa, cart, addToCart, removeFromCart, clearCart, total, checkout, prod
                                                     : 'bg-white border-gray-100 hover:border-primary/30 hover:shadow-xl hover:-translate-y-1'
                                                 }`}
                                             >
+                                                {status?.cliente_nome && status.cliente_nome !== `Mesa ${num}` && (
+                                                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-lg z-10 animate-in fade-in zoom-in duration-200">
+                                                        {status.cliente_nome.split(' ')[0]}
+                                                    </div>
+                                                )}
                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${status 
                                                     ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
                                                     : 'bg-gray-100 text-gray-400 group-hover:bg-primary/20 group-hover:text-primary'

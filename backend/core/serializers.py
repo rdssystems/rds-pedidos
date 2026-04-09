@@ -190,10 +190,16 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
     def validate_quantidade_mesas(self, value):
         if self.instance and self.instance.quantidade_mesas != value:
-            from .models import Pedido
-            active_orders = Pedido.objects.filter(loja=self.instance).exclude(status__in=['FINALIZADO', 'CANCELADO']).exists()
-            if active_orders:
-                raise serializers.ValidationError("Não é possível alterar a quantidade de mesas enquanto houver pedidos ativos.")
+            # Só bloqueia se houver redução de mesas e houver pedidos em mesas ativos
+            if value < self.instance.quantidade_mesas:
+                from .models import Pedido
+                active_table_orders = Pedido.objects.filter(
+                    loja=self.instance, 
+                    tipo='MESA'
+                ).exclude(status__in=['FINALIZADO', 'CANCELADO']).exists()
+                
+                if active_table_orders:
+                    raise serializers.ValidationError("Não é possível reduzir a quantidade de mesas enquanto houver pedidos ativos em mesas.")
         return value
 
     caixa_aberto = serializers.SerializerMethodField()

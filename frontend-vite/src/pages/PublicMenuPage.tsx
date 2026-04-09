@@ -261,6 +261,25 @@ export default function PublicMenuPage() {
         if (raw.length === 8) fetchViaCep(raw);
     };
 
+    const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length > 11) val = val.slice(0, 11);
+        
+        let formatted = val;
+        if (val.length > 0) {
+            if (val.length <= 2) {
+                formatted = `(${val}`;
+            } else if (val.length <= 6) {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2)}`;
+            } else if (val.length <= 10) {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2, 6)}-${val.slice(6)}`;
+            } else {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2, 7)}-${val.slice(7)}`;
+            }
+        }
+        setCheckoutData(prev => ({ ...prev, telefone: formatted }));
+    };
+
     const handleSubmitOrder = async () => {
         if (!store) return;
 
@@ -307,7 +326,7 @@ export default function PublicMenuPage() {
             const payload = {
                 loja: store.id,
                 cliente_nome: checkoutData.nome,
-                cliente_whatsapp: checkoutData.telefone,
+                cliente_whatsapp: checkoutData.telefone.replace(/\D/g, ''),
                 endereco: fullAddress,
                 total: grandTotal,
                 taxa_entrega: deliveryFee,
@@ -344,36 +363,39 @@ export default function PublicMenuPage() {
             const storePhone = formatWhatsappNumber(store.whatsapp).replace(/\D/g, '');
 
             const orderId = pedidoResponse?.numero_diario ? `#${pedidoResponse.numero_diario}` : `#${Date.now().toString().slice(-4)}`;
-            let message = `*🔔 NOVO PEDIDO ${orderId}* 🔔\n\n`;
-            message += `👤 *Cliente:* ${checkoutData.nome}\n`;
-            if (checkoutData.telefone) message += `📞 *Contato:* ${checkoutData.telefone}\n\n`;
-            message += `🛒 *RESUMO DO PEDIDO:*\n`;
+            
+            // Using Unicode escapes for emojis to avoid encoding issues
+            let message = `*\u{1F514} NOVO PEDIDO ${orderId}* \u{1F514}\n\n`;
+            message += `\u{1F464} *Cliente:* ${checkoutData.nome}\n`;
+            if (checkoutData.telefone) message += `\u{1F4DE} *Contato:* ${checkoutData.telefone}\n\n`;
+            message += `\u{1F6D2} *RESUMO DO PEDIDO:*\n`;
+            
             cart.forEach(item => {
-                message += `▪️ ${item.quantidade}x *${item.nome}*\n`;
+                message += `\u{25AA}\u{FE0F} ${item.quantidade}x *${item.nome}*\n`;
                 item.atributos.forEach(attr => {
-                    message += `   └ _${attr.nome} (+${formatCurrency(Number(attr.preco))})_\n`;
+                    message += `   \u{2514} _${attr.nome} (+${formatCurrency(Number(attr.preco))})_\n`;
                 });
                 message += `\n`;
             });
-
+ 
             if (checkoutData.metodo_entrega === 'ENTREGA') {
-                message += `📍 *ENTREGA:*\n${fullAddress}\n`;
-                message += `🛵 *Taxa de Entrega:* ${deliveryFee > 0 ? formatCurrency(deliveryFee) : 'Grátis'}\n\n`;
+                message += `\u{1F4CD} *ENTREGA:*\n${fullAddress}\n`;
+                message += `\u{1F6F5} *Taxa de Entrega:* ${deliveryFee > 0 ? formatCurrency(deliveryFee) : 'Grátis'}\n\n`;
             } else {
-                message += `🛍️ *RETIRADA:*\nO cliente vai retirar o pedido na loja.\n\n`;
+                message += `\u{1F6CD}\u{FE0F} *RETIRADA:*\nO cliente vai retirar o pedido na loja.\n\n`;
             }
-
-            message += `💳 *PAGAMENTO:*\n`;
+ 
+            message += `\u{1F4B3} *PAGAMENTO:*\n`;
             message += `Forma: ${checkoutData.pagamento}\n`;
             if (checkoutData.pagamento === 'DINHEIRO' && checkoutData.troco) {
                 message += `Troco para: R$ ${checkoutData.troco}\n`;
             }
-
-            message += `\n💰 *SUBTOTAL:* ${formatCurrency(total)}\n`;
+ 
+            message += `\n\u{1F4B0} *SUBTOTAL:* ${formatCurrency(total)}\n`;
             if (checkoutData.metodo_entrega === 'ENTREGA' && deliveryFee > 0) {
-                message += `💰 *TAXA ENTREGA:* ${formatCurrency(deliveryFee)}\n`;
+                message += `\u{1F4B0} *TAXA ENTREGA:* ${formatCurrency(deliveryFee)}\n`;
             }
-            message += `💰 *TOTAL A PAGAR: ${formatCurrency(grandTotal)}*\n`;
+            message += `\u{1F4B0} *TOTAL A PAGAR: ${formatCurrency(grandTotal)}*\n`;
             message += `\n_Pedido enviado via Cardápio Digital_`;
 
             const encoded = encodeURIComponent(message);
@@ -723,7 +745,7 @@ export default function PublicMenuPage() {
                                         <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 border-l-2 pl-3" style={{ borderColor: store.cor_primaria }}>Identificação</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <input type="text" value={checkoutData.nome} onChange={(e) => setCheckoutData({ ...checkoutData, nome: e.target.value })} className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm" placeholder="Seu Nome" />
-                                            <input type="tel" value={checkoutData.telefone} onChange={(e) => setCheckoutData({ ...checkoutData, telefone: e.target.value.replace(/\D/g, '') })} className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm" placeholder="WhatsApp (DDD)" maxLength={11} />
+                                            <input type="tel" value={checkoutData.telefone} onChange={handleTelefoneChange} className="w-full bg-white border border-gray-200 p-4 rounded-lg font-medium focus:outline-none focus:border-gray-900 transition-colors text-sm" placeholder="WhatsApp (DDD)" maxLength={15} />
                                         </div>
                                     </div>
 

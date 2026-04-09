@@ -34,7 +34,8 @@ export const PublicAuthModal: React.FC<PublicAuthModalProps> = ({ isOpen, onClos
     const formatPhone = (value: string) => {
         const numbers = value.replace(/\D/g, '');
         if (numbers.length <= 2) return numbers;
-        if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+        if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+        if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
     };
 
@@ -50,7 +51,8 @@ export const PublicAuthModal: React.FC<PublicAuthModalProps> = ({ isOpen, onClos
         }
         
         // Regex para (XX) 9XXXX-XXXX
-        const phoneRegex = /^\(\d{2}\) 9\d{4}-\d{4}$/;
+        // Regex para (XX) XXXX-XXXX ou (XX) XXXXX-XXXX
+        const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
         if (!phoneRegex.test(phone)) {
             setError('Formato inválido. Use (XX) 9XXXX-XXXX.');
             return false;

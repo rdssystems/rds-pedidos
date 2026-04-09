@@ -78,10 +78,35 @@ export default function PublicTablePage() {
             setCheckoutData(prev => ({
                 ...prev,
                 nome: customer.name,
-                telefone: customer.phone
+                telefone: formatTelefone(customer.phone)
             }));
         }
     }, [customer]);
+
+    const formatTelefone = (phone: string) => {
+        if (!phone) return '';
+        let val = phone.replace(/\D/g, '');
+        if (val.length > 11) val = val.slice(0, 11);
+        
+        let formatted = val;
+        if (val.length > 0) {
+            if (val.length <= 2) {
+                formatted = `(${val}`;
+            } else if (val.length <= 6) {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2)}`;
+            } else if (val.length <= 10) {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2, 6)}-${val.slice(6)}`;
+            } else {
+                formatted = `(${val.slice(0, 2)}) ${val.slice(2, 7)}-${val.slice(7)}`;
+            }
+        }
+        return formatted;
+    };
+
+    const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formatted = formatTelefone(e.target.value);
+        setCheckoutData(prev => ({ ...prev, telefone: formatted }));
+    };
 
     const checkStoreStatus = (data: StoreData) => {
         if (data && data.caixa_aberto === false) {
@@ -167,18 +192,17 @@ export default function PublicTablePage() {
             return;
         }
 
-        if (!checkoutData.nome || !checkoutData.telefone) {
-            alert('Por favor, preencha seu Nome e Whatsapp.');
-            return;
-        }
+        // Se não houver nome, usamos o padrão da mesa
+        const finalNome = checkoutData.nome.trim() || `Mesa ${mesaNumber}`;
+
 
         setIsSubmitting(true);
 
         try {
             const payload = {
                 loja: store.id,
-                cliente_nome: checkoutData.nome,
-                cliente_whatsapp: checkoutData.telefone,
+                cliente_nome: finalNome,
+                cliente_whatsapp: checkoutData.telefone.replace(/\D/g, ''),
                 endereco: `Mesa ${mesaNumber}`,
                 total: total,
                 taxa_entrega: 0,
@@ -546,12 +570,18 @@ export default function PublicTablePage() {
 
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Seu Nome</label>
+                                            <div className="flex justify-between items-center px-1">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Seu Nome</label>
+                                                <span className="text-[9px] font-bold text-gray-400/50 uppercase tracking-tighter">Opcional</span>
+                                            </div>
                                             <input type="text" value={checkoutData.nome} onChange={(e) => setCheckoutData({ ...checkoutData, nome: e.target.value })} className="w-full bg-gray-50 border border-transparent p-4 rounded-2xl font-bold focus:bg-white focus:border-primary transition-all text-sm" placeholder="Ex: João Silva" />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">WhatsApp</label>
-                                            <input type="tel" value={checkoutData.telefone} onChange={(e) => setCheckoutData({ ...checkoutData, telefone: e.target.value.replace(/\D/g, '') })} className="w-full bg-gray-50 border border-transparent p-4 rounded-2xl font-bold focus:bg-white focus:border-primary transition-all text-sm" placeholder="DD999999999" maxLength={11} />
+                                            <div className="flex justify-between items-center px-1">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">WhatsApp</label>
+                                                <span className="text-[9px] font-bold text-gray-400/50 uppercase tracking-tighter">Opcional</span>
+                                            </div>
+                                            <input type="tel" value={checkoutData.telefone} onChange={handleTelefoneChange} className="w-full bg-gray-50 border border-transparent p-4 rounded-2xl font-bold focus:bg-white focus:border-primary transition-all text-sm" placeholder="(DD) 99999-9999" maxLength={15} />
                                         </div>
                                     </div>
 

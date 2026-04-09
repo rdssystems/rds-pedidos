@@ -203,6 +203,7 @@ export default function StoreSettings() {
                     setPermitirPedidoMesa(s.permitir_pedido_mesa || false);
                     setModoCatalogoMesa(s.modo_catalogo_mesa || false);
                     setAtendimentoMesas(s.atendimento_mesas || false);
+                    setQuantidadeMesas(s.quantidade_mesas || 0);
                     if (s.quantidade_mesas > 0) setShowQRs(true);
 
                     // CRM

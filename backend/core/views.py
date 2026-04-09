@@ -330,6 +330,28 @@ class PedidoViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'public_history']: return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
+    @action(detail=False, methods=['get'])
+    def mesas(self, request):
+        loja_id = request.query_params.get('loja_id')
+        if not loja_id:
+            return Response({"error": "Loja ID required"}, status=400)
+            
+        from django.db.models import Count, Sum, Max
+        # Filtra apenas pedidos ativos (não finalizados/cancelados) do tipo MESA
+        pedidos_ativos = Pedido.objects.filter(
+            loja_id=loja_id,
+            tipo='MESA'
+        ).exclude(status__in=['FINALIZADO', 'CANCELADO'])
+        
+        # Agrupa por mesa, pegando o nome do cliente mais recente ou primeiro
+        mesas_stats = pedidos_ativos.values('mesa').annotate(
+            total=Sum('total'),
+            itens_count=Count('itens'),
+            cliente_nome=Max('cliente_nome')
+        )
+        
+        return Response(list(mesas_stats))
+
     def get_queryset(self):
         from django.utils.dateparse import parse_datetime
         user = self.request.user
@@ -339,6 +361,20 @@ class PedidoViewSet(viewsets.ModelViewSet):
         
         loja_id = self.request.query_params.get('loja_id')
         if loja_id: queryset = queryset.filter(loja_id=loja_id)
+
+        mesa = self.request.query_params.get('mesa')
+        if mesa: queryset = queryset.filter(mesa=mesa)
+
+        tipo = self.request.query_params.get('tipo')
+        if tipo: queryset = queryset.filter(tipo=tipo)
+
+        status_param = self.request.query_params.get('status')
+        if status_param: queryset = queryset.filter(status=status_param)
+
+        status_in = self.request.query_params.get('status__in')
+        if status_in: 
+            status_list = status_in.split(',')
+            queryset = queryset.filter(status__in=status_list)
 
         include_pending = self.request.query_params.get('include_pending') == 'true'
         start_date = self.request.query_params.get('start_date')
@@ -638,10 +674,17 @@ class CaixaViewSet(viewsets.ModelViewSet):
         pedido_data['loja'] = caixa.loja.id
         pedido_data['status'] = 'FINALIZADO'
         
+        mesa_orders = request.data.get('mesa_orders', [])
+        
         serializer = PedidoSerializer(data=pedido_data)
         if serializer.is_valid():
             with transaction.atomic():
                 pedido = serializer.save()
+                
+                # Finaliza os pedidos vinculados (ex: pedidos de mesa que estão sendo pagos)
+                if mesa_orders:
+                    Pedido.objects.filter(id__in=mesa_orders).update(status='FINALIZADO')
+
                 MovimentacaoCaixa.objects.create(
                     caixa=caixa,
                     tipo='VENDA',

@@ -64,6 +64,7 @@ def notify_order_change(sender, instance, created, **kwargs):
         msg = None
         
         # Context for placeholders
+        order_num = instance.numero_diario or instance.id
         context = {
             'cliente': instance.cliente_nome,
             'numero': order_num,
