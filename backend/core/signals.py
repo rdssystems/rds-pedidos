@@ -65,13 +65,17 @@ def notify_order_change(sender, instance, created, **kwargs):
     
     # Send WhatsApp Notification
     if instance.cliente_whatsapp and instance.loja.evolution_instance:
+        logger.info(f"DEBUG WHATSAPP: Pedido {instance.id} iniciado. Status: {instance.status}")
+
         # Detect status change or new order
         status_changed = created or (hasattr(instance, '_old_status') and instance._old_status != instance.status)
         if not status_changed:
+            logger.info("DEBUG WHATSAPP: Status não mudou. Abortando.")
             return
 
         recursos = instance.loja.plano.recursos if instance.loja.plano else {}
         is_trial = instance.loja.status_assinatura == 'trial'
+        logger.info(f"DEBUG WHATSAPP: Recursos: {recursos}. Is Trial: {is_trial}")
         
         if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation') and not is_trial:
             return
@@ -112,14 +116,15 @@ def notify_order_change(sender, instance, created, **kwargs):
 
         if msg:
             try:
-                logger.info(f"Enviando WhatsApp ({instance.status}) para {instance.cliente_whatsapp}")
-                EvolutionService().send_message(
+                logger.info(f"DEBUG WHATSAPP: Enviando para {instance.cliente_whatsapp} via {instance.loja.evolution_instance}")
+                res = EvolutionService().send_message(
                     instance.cliente_whatsapp,
                     msg,
                     instance.loja.evolution_instance
                 )
+                logger.info(f"DEBUG WHATSAPP: Resposta: {res}")
             except Exception as e:
-                logger.error(f"Erro ao enviar WhatsApp: {e}")
+                logger.error(f"DEBUG WHATSAPP: Erro no envio: {e}")
 
 @receiver(pre_save, sender=Pedido)
 def calculate_troco(sender, instance, **kwargs):
