@@ -1,22 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
-import { OrderListSimplified } from "@/components/kanban/OrderListSimplified";
 import { useBilling } from "@/context/BillingContext";
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function OrdersPage() {
     const { store, loading } = useBilling();
-    const [isMobile, setIsMobile] = useState(false);
-
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 1024);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
 
     if (loading || !store) {
         return (
@@ -48,10 +37,6 @@ export default function OrdersPage() {
                 </div>
             </div>
         );
-    }
-
-    if (store.plano_tipo === 'START' || store.plano_details?.nome === 'Basic' || isMobile) {
-        return <OrderListSimplified />;
     }
 
     return <KanbanBoard />;

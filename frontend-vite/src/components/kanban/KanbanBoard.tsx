@@ -31,7 +31,7 @@ const COLUMNS = [
     { id: 'FINALIZADO', title: 'CONCLUÍDOS', iconColor: 'bg-green-500',  accent: 'border-t-green-400' },
 ];
 
-const HIDDEN_STATUSES = ['CANCELADO'];
+const HIDDEN_STATUSES: string[] = [];
 
 const DIAS_MAP: Record<number, string> = {
     0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab'
@@ -238,7 +238,7 @@ export const KanbanBoard = () => {
         if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
         const ok = await patchPedidoStatus(pedidoId, 'CANCELADO');
         if (ok) {
-            setPedidos(prev => prev.filter(p => p.id !== pedidoId));
+            setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, status: 'CANCELADO' } : p));
             setSelectedPedido(null);
         }
     };
@@ -372,7 +372,11 @@ export const KanbanBoard = () => {
                 {COLUMNS
                     .filter(col => userRole !== 'driver' || col.id === 'PRONTO' || col.id === 'DESPACHADO')
                     .map(column => {
-                        const colPedidos = pedidos.filter(p => p.status === column.id);
+                        let colPedidos = pedidos.filter(p => p.status === column.id);
+                        if (column.id === 'FINALIZADO') {
+                            const cancelledPedidos = pedidos.filter(p => p.status === 'CANCELADO');
+                            colPedidos = [...colPedidos, ...cancelledPedidos];
+                        }
                         return (
                             <div
                                 key={column.id}
