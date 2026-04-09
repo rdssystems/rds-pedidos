@@ -23,6 +23,9 @@ interface Store {
     logo?: string | null;
     categorias?: any[];
     modo_catalogo?: boolean;
+    modo_catalogo_mesa?: boolean;
+    permitir_pedido_mesa?: boolean;
+    atendimento_mesas?: boolean;
     quantidade_mesas?: number;
     caixa_aberto?: boolean;
     pedidos_pendentes?: number;
