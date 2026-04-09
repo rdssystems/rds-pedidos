@@ -63,21 +63,28 @@ def notify_order_change(sender, instance, created, **kwargs):
         }
     )
     
-    # Send WhatsApp Notification
+    # Notificação WhatsApp
     if instance.cliente_whatsapp and instance.loja.evolution_instance:
-        logger.info(f"DEBUG WHATSAPP: Pedido {instance.id} iniciado. Status: {instance.status}")
-
-        # Detect status change or new order
+        # Detecta se o status mudou ou se é um pedido novo
         status_changed = created or (hasattr(instance, '_old_status') and instance._old_status != instance.status)
         if not status_changed:
-            logger.info("DEBUG WHATSAPP: Status não mudou. Abortando.")
             return
 
+        # Verifica permissão do plano ou status da assinatura
         recursos = instance.loja.plano.recursos if instance.loja.plano else {}
-        is_trial = instance.loja.status_assinatura == 'trial'
-        logger.info(f"DEBUG WHATSAPP: Recursos: {recursos}. Is Trial: {is_trial}")
+        status_assinatura = instance.loja.status_assinatura
         
-        if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation') and not is_trial:
+        # Permitimos o envio se:
+        # 1. O recurso estiver explicitamente no plano
+        # 2. A loja estiver em Trial ou Ativa (fallback para evitar bloqueios indevidos)
+        can_send = (
+            recursos.get('whatsapp') or 
+            recursos.get('whatsapp_automation') or 
+            status_assinatura in ['trial', 'active']
+        )
+        
+        if not can_send:
+            logger.warning(f"WhatsApp bloqueado para {instance.loja.nome}: Status {status_assinatura}")
             return
 
         order_num = instance.numero_diario or instance.id
@@ -103,8 +110,8 @@ def notify_order_change(sender, instance, created, **kwargs):
             elif instance.status == 'CANCELADO' and instance.loja.notificar_cancelado:
                 msg_template = instance.loja.msg_cancelado
 
-        msg = None
         if msg_template:
+            # Formatação segura
             try:
                 msg = msg_template.format(**context)
             except Exception:
@@ -113,18 +120,16 @@ def notify_order_change(sender, instance, created, **kwargs):
                 for k, v in context.items(): msg = msg.replace('{' + k + '}', str(v))
                 msg = re.sub(r'\{.*?\}', '', msg)
 
-
-        if msg:
             try:
-                logger.info(f"DEBUG WHATSAPP: Enviando para {instance.cliente_whatsapp} via {instance.loja.evolution_instance}")
-                res = EvolutionService().send_message(
+                # O EvolutionService agora cuida do Delay Aleatório e Presence: Composing automaticamente
+                EvolutionService().send_message(
                     instance.cliente_whatsapp,
                     msg,
                     instance.loja.evolution_instance
                 )
-                logger.info(f"DEBUG WHATSAPP: Resposta: {res}")
             except Exception as e:
-                logger.error(f"DEBUG WHATSAPP: Erro no envio: {e}")
+                logger.error(f"Erro ao enviar WhatsApp para {instance.loja.nome}: {e}")
+
 
 @receiver(pre_save, sender=Pedido)
 def calculate_troco(sender, instance, **kwargs):

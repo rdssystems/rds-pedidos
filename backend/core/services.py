@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 import os
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,10 @@ class EvolutionService:
             
         endpoint = f"{self.base_url}/message/sendText/{instance_name}"
         
+        # Anti-Ban Protection: Random delay between 3 and 8 seconds
+        # This mimics human behavior better than a fixed delay.
+        human_delay = random.randint(3000, 8000)
+        
         # Using both 'text' and 'textMessage' for maximum compatibility
         payload = {
             "number": clean_number,
@@ -102,15 +107,15 @@ class EvolutionService:
                 "text": message
             },
             "options": {
-                "delay": options.get('delay', 1200),
+                "delay": options.get('delay', human_delay),
                 "presence": options.get('presence', "composing"),
                 "linkPreview": options.get('linkPreview', False)
             }
         }
         
         try:
-            logger.info(f"Enviando mensagem WhatsApp para {clean_number} na instância {instance_name}")
-            response = requests.post(endpoint, json=payload, headers=self.headers, timeout=10)
+            logger.info(f"Enviando mensagem WhatsApp para {clean_number} (Delay: {payload['options']['delay']}ms)")
+            response = requests.post(endpoint, json=payload, headers=self.headers, timeout=15)
             
             if response.status_code >= 400:
                 logger.error(f"Erro Evolution API ({response.status_code}): {response.text}")
