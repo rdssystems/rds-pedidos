@@ -184,7 +184,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'valido_ate', 'tipo_taxa_entrega', 'taxa_entrega_fixa',
             'categorias', 'bairros_entrega',
             'bot_ativo_whatsapp', 'bot_personalidade', 'bot_conhecimento', 'bot_alerta_transbordo',
-            'modo_catalogo', 'quantidade_mesas', 'permitir_pedido_mesa', 'modo_catalogo_mesa', 'caixa_aberto', 'pedidos_pendentes',
+            'modo_catalogo', 'quantidade_mesas', 'permitir_pedido_mesa', 'modo_catalogo_mesa', 'atendimento_mesas', 'caixa_aberto', 'pedidos_pendentes',
             'crm_dias_ausente', 'crm_msg_ausente'
         ]
 

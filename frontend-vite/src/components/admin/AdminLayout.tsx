@@ -189,6 +189,11 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             return false;
         }
 
+        // 4. Check Feature Toggles
+        if (item.label === 'Mesas' && store?.atendimento_mesas === false) {
+            return false;
+        }
+
         return true;
     });
 
@@ -205,6 +210,11 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                 } else if (pathname !== '/orders' && userRoles.includes('waiter') && !['/mesas', '/orders'].includes(pathname)) {
                     navigate('/orders');
                 }
+            }
+            
+            // Feature toggle check
+            if (pathname === '/mesas' && store?.atendimento_mesas === false) {
+                navigate('/orders');
             }
         } else if (pathname === '/') {
             if (userRoles.includes('waiter')) navigate('/orders');

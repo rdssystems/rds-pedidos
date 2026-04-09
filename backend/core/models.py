@@ -116,6 +116,7 @@ class ConfiguracaoLoja(models.Model):
     permitir_pedido_mesa = models.BooleanField(default=False, help_text="Habilitar pedidos via QR Code nas mesas")
     modo_catalogo_mesa = models.BooleanField(default=False, help_text="Cardápio Mesa apenas visualização")
     quantidade_mesas = models.PositiveIntegerField(default=0, help_text="Número de mesas para geração de QR Codes")
+    atendimento_mesas = models.BooleanField(default=False, help_text="Habilitar o uso de Mesas no sistema")
 
     msg_recebido = models.TextField(
         default="Olá {cliente}! 👋 Recebemos seu pedido #{numero} em *{loja}*. Já vamos começar a preparar!",
