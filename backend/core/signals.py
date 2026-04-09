@@ -31,7 +31,19 @@ def send_whatsapp_message(number, text, instance_name=None):
     except Exception as e:
         logger.error(f"Error sending WhatsApp message: {e}")
 
+@receiver(pre_save, sender=Pedido)
+def track_status_change(sender, instance, **kwargs):
+    if instance.id:
+        try:
+            old = Pedido.objects.get(id=instance.id)
+            instance._old_status = old.status
+        except Pedido.DoesNotExist:
+            instance._old_status = None
+    else:
+        instance._old_status = None
+
 @receiver(post_save, sender=Pedido)
+
 def notify_order_change(sender, instance, created, **kwargs):
     from .serializers import PedidoSerializer
     channel_layer = get_channel_layer()
@@ -51,19 +63,19 @@ def notify_order_change(sender, instance, created, **kwargs):
         }
     )
     
-    # Send WhatsApp Notification on Status Change
-    if not created and instance.cliente_whatsapp and instance.loja.evolution_instance:
-        # Check if the plan allows WhatsApp automation
+    # Send WhatsApp Notification
+    if instance.cliente_whatsapp and instance.loja.evolution_instance:
+        # Detect status change or new order
+        status_changed = created or (hasattr(instance, '_old_status') and instance._old_status != instance.status)
+        if not status_changed:
+            return
+
         recursos = instance.loja.plano.recursos if instance.loja.plano else {}
         is_trial = instance.loja.status_assinatura == 'trial'
         
         if not recursos.get('whatsapp') and not recursos.get('whatsapp_automation') and not is_trial:
-            logger.info(f"WhatsApp automation disabled for plan {instance.loja.plano.nome if instance.loja.plano else 'None'} (Status: {instance.loja.status_assinatura})")
             return
 
-        msg = None
-        
-        # Context for placeholders
         order_num = instance.numero_diario or instance.id
         context = {
             'cliente': instance.cliente_nome,
@@ -71,31 +83,43 @@ def notify_order_change(sender, instance, created, **kwargs):
             'loja': instance.loja.nome
         }
         
-        if instance.status == 'NOVO' and instance.loja.notificar_recebido:
-            msg = instance.loja.msg_recebido.format(**context)
-        elif instance.status == 'PREPARO' and instance.loja.notificar_preparo:
-            msg = instance.loja.msg_preparo.format(**context)
-        elif instance.status == 'PRONTO' and instance.loja.notificar_pronto:
-            msg = instance.loja.msg_pronto.format(**context)
-        elif instance.status == 'DESPACHADO' and instance.loja.notificar_entrega:
-            msg = instance.loja.msg_entrega.format(**context)
-        elif instance.status == 'FINALIZADO' and instance.loja.notificar_finalizado:
-             msg = instance.loja.msg_finalizado.format(**context)
-        elif instance.status == 'CANCELADO' and instance.loja.notificar_cancelado:
-             msg = instance.loja.msg_cancelado.format(**context)
+        msg_template = None
+        if created:
+            if instance.status == 'NOVO' and instance.loja.notificar_recebido:
+                msg_template = instance.loja.msg_recebido
+        else:
+            if instance.status == 'PREPARO' and instance.loja.notificar_preparo:
+                msg_template = instance.loja.msg_preparo
+            elif instance.status == 'PRONTO' and instance.loja.notificar_pronto:
+                msg_template = instance.loja.msg_pronto
+            elif instance.status == 'DESPACHADO' and instance.loja.notificar_entrega:
+                msg_template = instance.loja.msg_entrega
+            elif instance.status == 'FINALIZADO' and instance.loja.notificar_finalizado:
+                msg_template = instance.loja.msg_finalizado
+            elif instance.status == 'CANCELADO' and instance.loja.notificar_cancelado:
+                msg_template = instance.loja.msg_cancelado
+
+        msg = None
+        if msg_template:
+            try:
+                msg = msg_template.format(**context)
+            except Exception:
+                import re
+                msg = msg_template
+                for k, v in context.items(): msg = msg.replace('{' + k + '}', str(v))
+                msg = re.sub(r'\{.*?\}', '', msg)
+
 
         if msg:
             try:
-                logger.info(f"Iniciando envio de mensagem via Evolution para {instance.cliente_whatsapp}...")
-                # Chamada corrigida: (number, message, instance_name)
+                logger.info(f"Enviando WhatsApp ({instance.status}) para {instance.cliente_whatsapp}")
                 EvolutionService().send_message(
                     instance.cliente_whatsapp,
                     msg,
                     instance.loja.evolution_instance
                 )
-                logger.info("Chamada para send_whatsapp_message concluída.")
             except Exception as e:
-                logger.error(f"Erro ao chamar send_whatsapp_message: {e}")
+                logger.error(f"Erro ao enviar WhatsApp: {e}")
 
 @receiver(pre_save, sender=Pedido)
 def calculate_troco(sender, instance, **kwargs):
