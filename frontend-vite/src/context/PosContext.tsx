@@ -122,7 +122,7 @@ export const PosProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         if (!lastMessage) return;
 
-        if (lastMessage.type === 'stock_update') {
+        if (lastMessage.type === 'STOCK_UPDATE') {
             const { id, estoque_atual, disponivel } = lastMessage.message || lastMessage;
             setProducts(prev => prev.map(p =>
                 p.id === id ? { ...p, estoque_atual, disponivel } : p

@@ -196,11 +196,26 @@ export default function PublicMenuPage() {
     }, [store]);
 
     useEffect(() => {
-        if (lastMessage && lastMessage.type === 'CAIXA_UPDATE' && store) {
+        if (!lastMessage || !store) return;
+
+        if (lastMessage.type === 'CAIXA_UPDATE') {
             const newStatus = lastMessage.status === 'ABERTO';
             const updatedStore = { ...store, caixa_aberto: newStatus };
             setStore(updatedStore);
             checkStoreStatus(updatedStore);
+        } else if (lastMessage.type === 'STOCK_UPDATE') {
+            const { id, estoque_atual, disponivel } = lastMessage.message || lastMessage;
+            
+            setStore(prev => {
+                if (!prev) return null;
+                const updatedCategorias = prev.categorias.map(cat => ({
+                    ...cat,
+                    produtos: cat.produtos.map((p: any) => 
+                        p.id === id ? { ...p, estoque_atual, disponivel } : p
+                    )
+                }));
+                return { ...prev, categorias: updatedCategorias };
+            });
         }
     }, [lastMessage, store]);
 
@@ -353,8 +368,8 @@ export default function PublicMenuPage() {
             });
 
             if (!response.ok) {
-                const err = await response.text();
-                throw new Error('Falha ao criar pedido: ' + err);
+                const errData = await response.json().catch(() => ({ detail: 'Falha ao processar pedido' }));
+                throw new Error(errData.detail || errData.error || 'Falha ao criar pedido');
             }
 
             const pedidoResponse = await response.json();

@@ -260,6 +260,8 @@ class Produto(models.Model):
         if self.controlar_estoque:
             if self.estoque_atual <= 0:
                 self.disponivel = False
+            else:
+                self.disponivel = True
         
         # Image Optimization
         if self.pk:

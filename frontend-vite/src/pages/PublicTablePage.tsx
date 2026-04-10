@@ -164,6 +164,29 @@ export default function PublicTablePage() {
         fetchStore();
     }, [slug, setStoreId]);
 
+    useEffect(() => {
+        if (!lastMessage || !store) return;
+
+        if (lastMessage.type === 'CAIXA_UPDATE') {
+            const newStatus = lastMessage.status === 'ABERTO';
+            const updatedStore = { ...store, caixa_aberto: newStatus };
+            setStore(updatedStore);
+            checkStoreStatus(updatedStore);
+        } else if (lastMessage.type === 'STOCK_UPDATE') {
+            const { id, estoque_atual, disponivel } = lastMessage.message || lastMessage;
+            setStore(prev => {
+                if (!prev) return null;
+                const updatedCategorias = prev.categorias.map(cat => ({
+                    ...cat,
+                    produtos: cat.produtos.map((p: any) => 
+                        p.id === id ? { ...p, estoque_atual, disponivel } : p
+                    )
+                }));
+                return { ...prev, categorias: updatedCategorias };
+            });
+        }
+    }, [lastMessage, store]);
+
     const getImageUrl = (url: string | null) => {
         if (!url) return '';
         if (url.startsWith('http')) {
@@ -228,7 +251,10 @@ export default function PublicTablePage() {
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error('Falha ao criar pedido');
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Falha ao criar pedido');
+            }
 
             clearCart();
             setIsCartOpen(false);

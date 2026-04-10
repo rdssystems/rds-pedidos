@@ -29,26 +29,26 @@ class OrderConsumer(AsyncWebsocketConsumer):
     async def order_notification(self, event):
         message = event['message']
 
-        # Send message to WebSocket
+        # Send message to WebSocket with UPPERCASE type
         await self.send(text_data=json.dumps({
-            'type': 'order_update',
+            'type': 'ORDER_UPDATE',
             'message': message
         }))
 
     async def stock_notification(self, event):
         message = event['message']
 
-        # Send message to WebSocket
+        # Send message to WebSocket with UPPERCASE type
         await self.send(text_data=json.dumps({
-            'type': 'stock_update',
+            'type': 'STOCK_UPDATE',
             'message': message
         }))
 
     async def caixa_notification(self, event):
         message = event['message']
 
-        # Send message to WebSocket
+        # Send message to WebSocket with UPPERCASE type
         await self.send(text_data=json.dumps({
-            'type': 'caixa_update',
+            'type': 'CAIXA_UPDATE',
             'message': message
         }))
