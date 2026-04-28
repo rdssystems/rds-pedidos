@@ -681,10 +681,16 @@ export default function PublicTablePage() {
             )}
 
             {/* MEUS PEDIDOS MODAL */}
-            <MeusPedidosModal 
-                isOpen={isMeusPedidosOpen} 
-                onClose={() => setIsMeusPedidosOpen(false)} 
-            />
+            {store && (
+                <MeusPedidosModal 
+                    isOpen={isMeusPedidosOpen} 
+                    onClose={() => setIsMeusPedidosOpen(false)} 
+                    storeId={store.id}
+                    clientWhatsapp={localStorage.getItem('client_whatsapp') || localStorage.getItem('rds_customer_phone') || ''}
+                    accentColor={store.cor_primaria}
+                    liveOrderUpdates={lastMessage?.type === 'ORDER_UPDATE' ? lastMessage.message : null}
+                />
+            )}
         </div>
     );
 }
