@@ -996,7 +996,7 @@ export default function PublicMenuPage() {
             <PublicAuthModal
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
-                storeId={store.id}
+                accentColor={store.cor_primaria}
             />
 
             <MeusPedidosModal 
