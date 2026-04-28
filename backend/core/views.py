@@ -556,8 +556,54 @@ class AtributoOpcaoViewSet(viewsets.ModelViewSet):
 class TeamMemberViewSet(viewsets.ModelViewSet):
     serializer_class = PerfilUsuarioLojaSerializer
     permission_classes = [permissions.IsAuthenticated]
+
     def get_queryset(self):
         return PerfilUsuarioLoja.objects.filter(Q(loja__owner=self.request.user) | Q(loja__equipe__user=self.request.user)).distinct()
+
+    def create(self, request, *args, **kwargs):
+        full_name = request.data.get('full_name')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        loja_id = request.data.get('loja')
+        role = request.data.get('role', 'waiter')
+
+        if not all([email, password, loja_id]):
+            return Response({"error": "Email, senha e loja são obrigatórios."}, status=400)
+
+        # Verificar se o usuário já existe
+        if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
+            return Response({"error": "Este email já está cadastrado."}, status=400)
+
+        try:
+            # Verificar se a loja existe e o usuário tem permissão nela
+            loja = ConfiguracaoLoja.objects.get(pk=loja_id)
+            if loja.owner != request.user and not PerfilUsuarioLoja.objects.filter(loja=loja, user=request.user, role='manager').exists():
+                return Response({"error": "Você não tem permissão para adicionar membros a esta loja."}, status=403)
+
+            with transaction.atomic():
+                # Criar o usuário
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=password,
+                    first_name=full_name
+                )
+                user.is_active = True # Membros de equipe são ativos por padrão
+                user.save()
+
+                # Criar o perfil vinculado à loja
+                perfil = PerfilUsuarioLoja.objects.create(
+                    user=user,
+                    loja=loja,
+                    role=role
+                )
+
+                serializer = self.get_serializer(perfil)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ConfiguracaoLoja.DoesNotExist:
+            return Response({"error": "Loja não encontrada."}, status=404)
+        except Exception as e:
+            return Response({"error": f"Erro ao criar membro: {str(e)}"}, status=500)
 
 class CaixaViewSet(viewsets.ModelViewSet):
     serializer_class = CaixaSerializer

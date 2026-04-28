@@ -52,9 +52,14 @@ export default function TeamPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    const membersCount = team.filter(m => m.role !== 'owner').length;
     const isPlanStart = store?.plano_tipo === 'START';
     const isPlanPro = store?.plano_tipo === 'PRO';
-    const canAddMore = !isPlanStart && !(isPlanPro && team.length >= 3);
+    
+    // START: 0 funcionários extras
+    // PRO: 10 funcionários extras (não conta o proprietário)
+    // ELITE: Sem limite explícito
+    const canAddMore = !isPlanStart && !(isPlanPro && membersCount >= 10);
 
     const fetchTeam = async () => {
         try {
