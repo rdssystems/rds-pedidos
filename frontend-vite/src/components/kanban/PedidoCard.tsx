@@ -27,12 +27,12 @@ interface PedidoCardProps {
     onDragStart?: (e: React.DragEvent<HTMLDivElement>, id: number) => void;
 }
 
-const STATUS_CFG: Record<string, { label: string; dot: string; pill: string }> = {
-    NOVO:       { label: 'Novo',      dot: 'bg-blue-500',   pill: 'bg-blue-50 text-blue-600 border-blue-200' },
-    PREPARO:    { label: 'Preparo',   dot: 'bg-amber-500',  pill: 'bg-amber-50 text-amber-600 border-amber-200' },
-    PRONTO:     { label: 'Pronto',    dot: 'bg-teal-500',   pill: 'bg-teal-50 text-teal-600 border-teal-200' },
-    DESPACHADO: { label: 'Entrega',   dot: 'bg-orange-500', pill: 'bg-orange-50 text-orange-600 border-orange-200' },
-    FINALIZADO: { label: 'Concluído', dot: 'bg-green-500',  pill: 'bg-green-50 text-green-600 border-green-200' },
+const STATUS_CFG: Record<string, { label: string; dot: string; pill: string; accent: string }> = {
+    NOVO:       { label: 'Novo',      dot: 'bg-blue-500',   pill: 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm', accent: 'from-blue-500 to-blue-400' },
+    PREPARO:    { label: 'Preparo',   dot: 'bg-amber-500',  pill: 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm', accent: 'from-amber-500 to-amber-400' },
+    PRONTO:     { label: 'Pronto',    dot: 'bg-teal-500',   pill: 'bg-teal-50 text-teal-700 border-teal-200 shadow-sm', accent: 'from-teal-500 to-teal-400' },
+    DESPACHADO: { label: 'Entrega',   dot: 'bg-orange-500', pill: 'bg-orange-50 text-orange-700 border-orange-200 shadow-sm', accent: 'from-orange-500 to-orange-400' },
+    FINALIZADO: { label: 'Concluído', dot: 'bg-green-500',  pill: 'bg-green-50 text-green-700 border-green-200 shadow-sm', accent: 'from-green-500 to-green-400' },
 };
 
 export const PedidoCard: React.FC<PedidoCardProps> = ({
@@ -67,93 +67,100 @@ export const PedidoCard: React.FC<PedidoCardProps> = ({
     };
 
     const nextLabel = getNextLabel();
-    const statusCfg = STATUS_CFG[pedido.status] || { label: pedido.status, dot: 'bg-gray-400', pill: 'bg-gray-50 text-gray-500 border-gray-200' };
+    const statusCfg = STATUS_CFG[pedido.status] || { label: pedido.status, dot: 'bg-gray-400', pill: 'bg-gray-50 text-gray-600 border-gray-200 shadow-sm', accent: 'from-gray-400 to-gray-300' };
     const delayText = minutesElapsed >= 60 ? `${(minutesElapsed / 60).toFixed(1)}h` : `${minutesElapsed}m`;
 
     return (
         <div
             draggable={draggable}
             onDragStart={e => onDragStart && onDragStart(e, pedido.id)}
-            className={`bg-white rounded-lg border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${
+            className={`group relative bg-white rounded-xl border transition-all duration-300 hover:-translate-y-1 ${
                 isDelayed
-                    ? 'border-red-300 shadow-[0_0_0_1px_rgba(239,68,68,0.15)]'
-                    : 'border-gray-200 shadow-sm'
+                    ? 'border-red-200 shadow-[0_4px_16px_rgba(239,68,68,0.12)] hover:shadow-[0_8px_24px_rgba(239,68,68,0.2)]'
+                    : 'border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)]'
             } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
-            {/* Thin top accent bar by status */}
-            <div className={`h-0.5 w-full rounded-t-lg ${statusCfg.dot}`} />
+            {/* Top gradient accent bar */}
+            <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-xl bg-gradient-to-r ${statusCfg.accent}`} />
 
-            <div className="p-3">
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-gray-400 tracking-wider">
-                        #{pedido.numero_diario || pedido.id}
-                    </span>
-                    <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 ${statusCfg.pill}`}>
+            <div className="p-3 pt-3.5 flex flex-col h-full">
+                {/* Header Row: ID, Tipo e Pagamento (Esquerda) | Status Pill (Direita) */}
+                <div className="flex items-center justify-between mb-2 gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+                        <span className="text-[11px] font-black text-gray-400 tracking-wider">
+                            #{pedido.numero_diario || pedido.id}
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0"></span>
+                        <span className="bg-gray-100 text-gray-600 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider flex-shrink-0">
+                            {pedido.tipo}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium truncate">
+                            {pedido.forma_pagamento}
+                        </span>
+                    </div>
+                    <span className={`text-[9px] font-bold border rounded-md px-1.5 py-0.5 uppercase tracking-wide flex-shrink-0 ${statusCfg.pill}`}>
                         {statusCfg.label}
                     </span>
                 </div>
 
-                {/* Nome do Cliente + Ícone de Histórico */}
-                <div className="flex items-center justify-between mb-0.5">
-                    <p className="font-bold text-gray-900 text-sm leading-tight truncate">
-                        {pedido.cliente_nome}
-                    </p>
-                    {pedido.cliente_whatsapp && onVerHistorico && store?.plano_tipo !== 'START' && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); onVerHistorico(pedido.cliente_whatsapp || ''); }}
-                            className="p-1.5 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
-                            title="Ver histórico e notas"
-                        >
-                            <HistoryIcon size={18} />
-                        </button>
-                    )}
-                </div>
-                <p className="text-[11px] text-gray-400 mb-3">
-                    {pedido.tipo} · {pedido.forma_pagamento}
-                </p>
-
-                {/* Price + delay badge */}
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-base font-black text-gray-900">
-                        R$ {pedido.total}
-                    </span>
-                    {isDelayed && (
-                        <span className="flex items-center gap-1 text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-200">
-                            <Clock size={9} /> {delayText}
+                {/* Main Row: Nome do Cliente e Histórico (Esquerda) | Valor e Atraso (Direita) */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                        <p className="font-extrabold text-gray-900 text-sm leading-tight truncate">
+                            {pedido.cliente_nome}
+                        </p>
+                        {pedido.cliente_whatsapp && onVerHistorico && store?.plano_tipo !== 'START' && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onVerHistorico(pedido.cliente_whatsapp || ''); }}
+                                className="p-1 text-orange-400 hover:text-white hover:bg-orange-500 rounded-md transition-colors flex-shrink-0"
+                                title="Ver histórico e notas"
+                            >
+                                <HistoryIcon size={14} />
+                            </button>
+                        )}
+                    </div>
+                    
+                    <div className="flex flex-col items-end flex-shrink-0">
+                        <span className="text-sm font-black text-gray-900 tracking-tight leading-none">
+                            R$ {pedido.total}
                         </span>
-                    )}
+                        {isDelayed && (
+                            <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 px-1 mt-1 rounded border border-red-100 animate-pulse">
+                                <Clock size={8} /> {delayText}
+                            </span>
+                        )}
+                    </div>
                 </div>
-
-                {/* Divider */}
-                <div className="h-px bg-gray-100 mb-3" />
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 mt-auto">
                     <button
                         onClick={e => { e.stopPropagation(); onVerPedido(pedido.id); }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs font-semibold transition-colors flex-1 sm:flex-none"
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900 text-xs font-bold transition-all shadow-sm hover:shadow"
                         title="Ver detalhes"
                     >
-                        <Eye size={12} /> <span className="hidden sm:inline">Ver</span>
+                        <Eye size={14} />
                     </button>
 
                     <button
                         onClick={e => { e.stopPropagation(); onImprimir(); }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-primary hover:border-primary/30 transition-all flex-1"
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-[#007A87] hover:border-[#007A87]/30 hover:bg-[#007A87]/5 transition-all shadow-sm hover:shadow"
                         title="Imprimir comanda"
                     >
-                        <Printer size={12} />
+                        <Printer size={14} />
                     </button>
-
 
                     {nextLabel && (
                         <button
                             onClick={e => { e.stopPropagation(); onAvançar(); }}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#007A87] text-white text-xs font-bold hover:bg-[#006673] transition-colors shadow-sm"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#007A87] text-white text-[11px] font-bold hover:bg-[#006673] transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 group/btn"
                         >
                             {nextLabel}
-                            {pedido.status === 'DESPACHADO' ? <CheckCheck size={12} /> : <ArrowRight size={12} />}
+                            {pedido.status === 'DESPACHADO' ? (
+                                <CheckCheck size={14} className="transition-transform group-hover/btn:scale-110" />
+                            ) : (
+                                <ArrowRight size={14} className="transition-transform group-hover/btn:translate-x-1" />
+                            )}
                         </button>
                     )}
                 </div>

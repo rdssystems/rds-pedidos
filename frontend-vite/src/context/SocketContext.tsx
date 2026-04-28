@@ -25,8 +25,13 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host;
+            const clientWhatsapp = localStorage.getItem('client_whatsapp');
+            
             // Use the loja-specific endpoint to get notifications for this store
-            const socketUrl = `${protocol}//${host}/ws/loja/${storeId}/`;
+            let socketUrl = `${protocol}//${host}/ws/loja/${storeId}/`;
+            if (clientWhatsapp) {
+                socketUrl += `?whatsapp=${clientWhatsapp}`;
+            }
 
             console.log(`Socket: Connecting to ${socketUrl}`);
             socket = new WebSocket(socketUrl);
@@ -41,7 +46,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
                     const data = JSON.parse(event.data);
                     console.log('WebSocket Message Received:', data);
                     // Standardize message format if needed, here we just pass the message object
-                    setLastMessage(data.message || data);
+                    setLastMessage(data);
                 } catch (e) {
                     console.error('Error parsing socket message:', e);
                 }

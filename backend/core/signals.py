@@ -63,6 +63,19 @@ def notify_order_change(sender, instance, created, **kwargs):
         }
     )
     
+    # Send to specific client group (if they have whatsapp)
+    if instance.cliente_whatsapp:
+        client_whatsapp = ''.join(filter(str.isdigit, instance.cliente_whatsapp))
+        if client_whatsapp:
+            client_group_name = f"store_{instance.loja.id}_client_{client_whatsapp}"
+            async_to_sync(channel_layer.group_send)(
+                client_group_name,
+                {
+                    "type": "order_notification",
+                    "message": message
+                }
+            )
+    
     # Notificação WhatsApp
     if instance.cliente_whatsapp and instance.loja.evolution_instance:
         # Detecta se o status mudou ou se é um pedido novo

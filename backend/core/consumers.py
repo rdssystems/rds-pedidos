@@ -5,8 +5,19 @@ class OrderConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.store_id = self.scope['url_route']['kwargs'].get('store_id')
         
+        # Parse query string for whatsapp parameter
+        from urllib.parse import parse_qs
+        query_string = self.scope['query_string'].decode()
+        params = parse_qs(query_string)
+        whatsapp_list = params.get('whatsapp')
+        self.whatsapp = None
+        
         if self.store_id:
-            self.group_name = f"store_{self.store_id}"
+            if whatsapp_list and whatsapp_list[0]:
+                self.whatsapp = ''.join(filter(str.isdigit, whatsapp_list[0]))
+                self.group_name = f"store_{self.store_id}_client_{self.whatsapp}"
+            else:
+                self.group_name = f"store_{self.store_id}"
         else:
             self.group_name = "administracao" # Fallback/Legacy
         

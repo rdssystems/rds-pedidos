@@ -7,8 +7,9 @@ import { ProductModal } from '@/components/menu/ProductModal';
 import { CategorySidebar } from '@/components/menu/CategorySidebar';
 import { PublicProductCard } from '@/components/menu/PublicProductCard';
 import { PublicAuthModal } from '@/components/menu/PublicAuthModal';
+import { MeusPedidosModal } from '@/components/menu/MeusPedidosModal';
 import { useCustomer } from '@/context/CustomerContext';
-import { ShoppingBag, ChevronRight, X, Clock, MapPin, Phone, Search, User as UserIcon, LogIn, ChevronDown, Minus, Plus, List } from 'lucide-react';
+import { ShoppingBag, ChevronRight, X, Clock, MapPin, Phone, Search, User as UserIcon, LogIn, ChevronDown, Minus, Plus, List, Package } from 'lucide-react';
 
 interface StoreData {
     id: number;
@@ -51,6 +52,8 @@ export default function PublicMenuPage() {
     const [isCartOpen, setIsCartOpen] = useState(false); // For mobile sidebar
     const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isMeusPedidosOpen, setIsMeusPedidosOpen] = useState(false);
+    const [isHoursModalOpen, setIsHoursModalOpen] = useState(false);
     const { customer, isAuthenticated } = useCustomer();
 
     // Checkout State
@@ -199,7 +202,8 @@ export default function PublicMenuPage() {
         if (!lastMessage || !store) return;
 
         if (lastMessage.type === 'CAIXA_UPDATE') {
-            const newStatus = lastMessage.status === 'ABERTO';
+            const payload = lastMessage.message || lastMessage;
+            const newStatus = payload.status === 'ABERTO';
             const updatedStore = { ...store, caixa_aberto: newStatus };
             setStore(updatedStore);
             checkStoreStatus(updatedStore);
@@ -418,6 +422,9 @@ export default function PublicMenuPage() {
 
             localStorage.setItem('activeStoreId', store.id.toString());
             setStoreId(store.id);
+            if (checkoutData.telefone) {
+                localStorage.setItem('client_whatsapp', checkoutData.telefone.replace(/\D/g, ''));
+            }
 
             clearCart();
             setCheckoutData(prev => ({ ...prev, pagamento: 'PIX', troco: '' }));
@@ -448,7 +455,7 @@ export default function PublicMenuPage() {
             <div className="bg-white border-b border-gray-200 py-2 hidden sm:block sticky top-0 z-[60] shadow-sm">
                 <div className="max-w-[1400px] mx-auto px-6 flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 cursor-pointer hover:text-gray-900 transition-colors" onClick={() => setIsHoursModalOpen(true)}>
                             <Clock size={12} className="text-gray-400" />
                             <span>{isOpenStatus.label} • {(() => {
                                 const h = store.horario_funcionamento?.[DIAS_MAP[new Date().getDay()]];
@@ -461,7 +468,7 @@ export default function PublicMenuPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className={`px-2 py-0.5 rounded ${isOpenStatus.open ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                        <div className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${isOpenStatus.open ? 'bg-green-50 text-green-600 border border-green-100 hover:bg-green-100' : 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100'}`} onClick={() => setIsHoursModalOpen(true)}>
                             {isOpenStatus.label}
                         </div>
                     </div>
@@ -494,9 +501,9 @@ export default function PublicMenuPage() {
                                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 leading-none mb-4">
                                     {store.nome}
                                 </h1>
-                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-2">
                                     {isOpenStatus.open ? (
-                                        <div className="bg-green-50 text-green-700 border border-green-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                        <div onClick={() => setIsHoursModalOpen(true)} className="bg-green-50 text-green-700 border border-green-100 px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:bg-green-100 transition-colors">
                                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                                             Aberto Agora ({(() => {
                                                 const h = store.horario_funcionamento?.[DIAS_MAP[new Date().getDay()]];
@@ -504,13 +511,23 @@ export default function PublicMenuPage() {
                                             })()})
                                         </div>
                                     ) : (
-                                        <div className="bg-red-50 text-red-700 border border-red-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                        <div onClick={() => setIsHoursModalOpen(true)} className="bg-red-50 text-red-700 border border-red-100 px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:bg-red-100 transition-colors">
                                             <div className="w-2 h-2 rounded-full bg-red-400"></div>
                                             Loja Fechada {(() => {
                                                 const h = store.horario_funcionamento?.[DIAS_MAP[new Date().getDay()]];
                                                 return h && !h.closed && h.open ? `- Abre às ${h.open}` : '';
                                             })()}
                                         </div>
+                                    )}
+
+                                    {localStorage.getItem('client_whatsapp') && (
+                                        <button
+                                            onClick={() => setIsMeusPedidosOpen(true)}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-[10px] sm:text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all bg-white"
+                                        >
+                                            <Package size={14} className="text-primary" style={{ color: store.cor_primaria }} />
+                                            <span>Meus Pedidos</span>
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -859,19 +876,54 @@ export default function PublicMenuPage() {
                                             <svg className="w-7 h-7 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                         </div>
                                         <p className="font-bold text-gray-900 text-sm">Pedido enviado com sucesso!</p>
-                                        <p className="text-xs text-gray-400 mt-1">Acompanhe o status pelo WhatsApp da loja</p>
+                                        <p className="text-xs text-gray-400 mt-1">Acompanhe o status do seu pedido</p>
                                     </div>
+                                    
+                                    {'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied' && (
+                                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center mb-2">
+                                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 mx-auto mb-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                            </div>
+                                            <p className="text-[11px] text-blue-800 font-bold mb-3 leading-tight">
+                                                Deseja ser avisado quando o pedido sair para entrega?
+                                            </p>
+                                            <button 
+                                                onClick={(e) => {
+                                                    const btn = e.currentTarget;
+                                                    if ('Notification' in window) {
+                                                        Notification.requestPermission().then(permission => {
+                                                            if (permission === 'granted') {
+                                                                btn.innerText = 'Notificações Ativadas!';
+                                                                btn.classList.add('bg-green-600');
+                                                                btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                                                                setTimeout(() => setStore({...store}), 2000); // Trigger tiny re-render to hide it
+                                                            }
+                                                        });
+                                                    }
+                                                }}
+                                                className="w-full py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                                            >
+                                                Ativar Notificações
+                                            </button>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => { setIsCartOpen(false); setView('cart'); setOrderSuccessData(null); setIsMeusPedidosOpen(true); }}
+                                        className="w-full flex items-center justify-center gap-3 py-4 bg-green-500 text-white rounded-lg font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-green-600 transition-all"
+                                    >
+                                        <Package size={18} fill="white" /> Acompanhar meu pedido
+                                    </button>
                                     <a
                                         href={orderSuccessData?.whatsappLink}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full flex items-center justify-center gap-3 py-4 bg-green-500 text-white rounded-lg font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-green-600 transition-all"
+                                        className="w-full flex items-center justify-center gap-3 py-3 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-gray-50 transition-all"
                                     >
-                                        <Phone size={18} fill="white" /> Acompanhar pelo WhatsApp
+                                        <Phone size={14} /> Acompanhar pelo WhatsApp
                                     </a>
                                     <button
                                         onClick={() => { setIsCartOpen(false); setView('cart'); setOrderSuccessData(null); }}
-                                        className="w-full py-3 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-gray-50 transition-all"
+                                        className="w-full py-3 text-gray-500 text-xs uppercase tracking-widest hover:underline transition-all font-bold"
                                     >
                                         Voltar ao Cardápio
                                     </button>
@@ -937,6 +989,58 @@ export default function PublicMenuPage() {
                         </div>
                         <div className="p-8 bg-gray-50 border-t border-gray-100">
                             <button onClick={() => setIsDeliveryModalOpen(false)} className="w-full py-4 bg-gray-900 text-white rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-black transition-all">FECHAR</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <PublicAuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                storeId={store.id}
+            />
+
+            <MeusPedidosModal 
+                isOpen={isMeusPedidosOpen}
+                onClose={() => setIsMeusPedidosOpen(false)}
+                storeId={store.id}
+                clientWhatsapp={localStorage.getItem('client_whatsapp') || checkoutData.telefone}
+                accentColor={store.cor_primaria}
+                liveOrderUpdates={lastMessage?.type === 'ORDER_UPDATE' ? lastMessage.message : null}
+            />
+            {isHoursModalOpen && (
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in relative">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <h3 className="font-bold text-gray-900 uppercase tracking-widest text-sm flex items-center gap-2">
+                                <Clock size={16} className="text-gray-400" /> Horários de Funcionamento
+                            </h3>
+                            <button onClick={() => setIsHoursModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            {[
+                                { k: 'seg', l: 'Segunda-feira' },
+                                { k: 'ter', l: 'Terça-feira' },
+                                { k: 'qua', l: 'Quarta-feira' },
+                                { k: 'qui', l: 'Quinta-feira' },
+                                { k: 'sex', l: 'Sexta-feira' },
+                                { k: 'sab', l: 'Sábado' },
+                                { k: 'dom', l: 'Domingo' }
+                            ].map(day => {
+                                const h = store.horario_funcionamento?.[day.k];
+                                const isClosed = !h || h.closed || h === 'Fechado';
+                                const isToday = DIAS_MAP[new Date().getDay()] === day.k;
+                                
+                                return (
+                                    <div key={day.k} className={`flex justify-between items-center text-sm ${isToday ? 'font-bold text-gray-900 bg-gray-50 -mx-3 px-3 py-1 rounded-md' : 'text-gray-600'}`}>
+                                        <span>{day.l} {isToday && <span className="ml-1 text-[10px] uppercase text-primary" style={{color: store.cor_primaria}}>(Hoje)</span>}</span>
+                                        <span className={isClosed ? 'text-red-500 font-medium' : ''}>
+                                            {isClosed ? 'Fechado' : `${h.open} às ${h.close}`}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
