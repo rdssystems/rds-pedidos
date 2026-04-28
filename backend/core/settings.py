@@ -100,6 +100,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': '5432',
+        'CONN_MAX_AGE': 60,
     }
 }
 
@@ -128,7 +129,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = True # In production, restrict this.
+CORS_ALLOWED_ORIGINS = [
+    'https://rdspedidos.com.br',
+    'https://www.rdspedidos.com.br',
+    'https://app.rdspedidos.com.br',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
@@ -137,6 +144,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/hour'
+    }
 }
 
 from datetime import timedelta
