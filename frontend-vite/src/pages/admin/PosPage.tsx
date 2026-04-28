@@ -317,8 +317,8 @@ const { caixa, cart, addToCart, removeFromCart, clearCart, total, checkout, prod
                                                     addToCart(product);
                                                 }
                                             }}
-                                            disabled={!product.disponivel || !caixa || caixa.status === 'FECHADO'}
-                                            className="bg-white p-2 lg:p-3 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center gap-1.5 lg:gap-2.5 border border-transparent hover:border-primary/20 active:scale-95 disabled:opacity-50 disabled:grayscale group relative overflow-hidden h-full"
+                                            disabled={!product.disponivel || (product.controlar_estoque && Number(product.estoque_atual) <= 0) || !caixa || caixa.status === 'FECHADO'}
+                                            className={`bg-white p-2 lg:p-3 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center gap-1.5 lg:gap-2.5 border border-transparent hover:border-primary/20 active:scale-95 disabled:opacity-50 disabled:grayscale group relative overflow-hidden h-full ${(!product.disponivel || (product.controlar_estoque && Number(product.estoque_atual) <= 0)) ? 'grayscale opacity-60' : ''}`}
                                         >
                                             {/* Miniatura da Imagem */}
                                             <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden border border-gray-100 group-hover:border-primary/20 transition-all">

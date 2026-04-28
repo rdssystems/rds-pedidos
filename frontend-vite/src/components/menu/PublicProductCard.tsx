@@ -9,6 +9,7 @@ interface Product {
     imagem: string | null;
     controlar_estoque?: boolean;
     estoque_atual?: number;
+    disponivel?: boolean;
 }
 
 interface PublicProductCardProps {
@@ -25,7 +26,8 @@ export const PublicProductCard: React.FC<PublicProductCardProps> = ({
     getImageUrl
 }) => {
     // Check if product is out of stock
-    const isOutOfStock = product.controlar_estoque && product.estoque_atual !== undefined && product.estoque_atual !== null && Number(product.estoque_atual) <= 0;
+    // Check if product is out of stock (manually unavailable or stock reached 0)
+    const isOutOfStock = product.disponivel === false || (product.controlar_estoque && product.estoque_atual !== undefined && product.estoque_atual !== null && Number(product.estoque_atual) <= 0);
 
     return (
         <button 
