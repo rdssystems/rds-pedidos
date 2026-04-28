@@ -6,6 +6,7 @@ import { ProductModal } from '@/components/menu/ProductModal';
 import { CategorySidebar } from '@/components/menu/CategorySidebar';
 import { PublicProductCard } from '@/components/menu/PublicProductCard';
 import { PublicAuthModal } from '@/components/menu/PublicAuthModal';
+import { MeusPedidosModal } from '@/components/menu/MeusPedidosModal';
 import { useCustomer } from '@/context/CustomerContext';
 import { 
     ShoppingBag, 
@@ -22,7 +23,8 @@ import {
     ChevronRight,
     ChevronDown,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    Package
 } from 'lucide-react';
 
 interface StoreData {
@@ -62,6 +64,7 @@ export default function PublicTablePage() {
     const [activeCategory, setActiveCategory] = useState<number | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isMeusPedidosOpen, setIsMeusPedidosOpen] = useState(false);
     
     // Checkout State
     const [view, setView] = useState<'cart' | 'checkout'>('cart');
@@ -351,6 +354,16 @@ export default function PublicTablePage() {
                                     <div className="w-2 h-2 rounded-full bg-red-400"></div>
                                     Loja Fechada
                                 </div>
+                            )}
+
+                            {(localStorage.getItem('client_whatsapp') || localStorage.getItem('rds_customer_phone')) && (
+                                <button
+                                    onClick={() => setIsMeusPedidosOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-gray-50 transition-all bg-white"
+                                >
+                                    <Package size={14} className="text-primary" style={{ color: store.cor_primaria }} />
+                                    <span>Meus Pedidos</span>
+                                </button>
                             )}
                         </div>
                     </div>
@@ -666,6 +679,12 @@ export default function PublicTablePage() {
                     </div>
                 </div>
             )}
+
+            {/* MEUS PEDIDOS MODAL */}
+            <MeusPedidosModal 
+                isOpen={isMeusPedidosOpen} 
+                onClose={() => setIsMeusPedidosOpen(false)} 
+            />
         </div>
     );
 }

@@ -520,7 +520,7 @@ export default function PublicMenuPage() {
                                         </div>
                                     )}
 
-                                    {localStorage.getItem('client_whatsapp') && (
+                                    {(localStorage.getItem('client_whatsapp') || localStorage.getItem('rds_customer_phone')) && (
                                         <button
                                             onClick={() => setIsMeusPedidosOpen(true)}
                                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-[10px] sm:text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all bg-white"
